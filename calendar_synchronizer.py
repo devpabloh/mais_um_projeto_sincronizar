@@ -12,6 +12,9 @@ class CalendarSynchronizer:
         self.google_events_cache = {}
         self.outlook_events_cache = {}
         self.last_sync_time = datetime.now()
+        # Adicionar mapeamento entre IDs de eventos para rastrear correspondências
+        self.google_to_outlook_map = {}  # Google ID -> Outlook ID
+        self.outlook_to_google_map = {}  # Outlook ID -> Google ID
     
     def _update_caches(self):
         """Atualiza os caches com o estado atual dos calendários"""
@@ -37,36 +40,30 @@ class CalendarSynchronizer:
         # Detectar mudanças desde a última sincronização
         google_added = {id: event for id, event in new_google_cache.items() 
                        if id not in self.google_events_cache}
+        google_updated = {id: event for id, event in new_google_cache.items() 
+                         if id in self.google_events_cache and self._is_event_updated(event, self.google_events_cache[id])}
+        google_deleted = {id: self.google_events_cache[id] for id in self.google_events_cache 
+                         if id not in new_google_cache}
         
         outlook_added = {id: event for id, event in new_outlook_cache.items() 
                         if id not in self.outlook_events_cache}
+        outlook_updated = {id: event for id, event in new_outlook_cache.items() 
+                          if id in self.outlook_events_cache and self._is_event_updated(event, self.outlook_events_cache[id])}
+        outlook_deleted = {id: self.outlook_events_cache[id] for id in self.outlook_events_cache 
+                          if id not in new_outlook_cache}
         
-        # Imprimir informações de debug
+        # Debug info
         if google_added:
             print(f"Novos eventos detectados no Google: {len(google_added)}")
             for id, event in google_added.items():
-                print(f"  - Novo no Google: {event.get('summary', 'Sem título')} ({id})")
-                
-                # Verificar se já existe correspondente no Outlook
-                found = False
-                for outlook_id, outlook_event in new_outlook_cache.items():
-                    if self._events_match(event, outlook_event):
-                        found = True
-                        print(f"    - Já existe no Outlook: {outlook_event.get('subject', 'Sem título')} ({outlook_id})")
-                        break
-                
-                if not found:
-                    print(f"    - Precisa ser criado no Outlook")
+                print(f"  - {event.get('summary', 'Sem título')} ({id})")
         
         if outlook_added:
             print(f"Novos eventos detectados no Outlook: {len(outlook_added)}")
             for id, event in outlook_added.items():
-                print(f"  - Novo no Outlook: {event.get('subject', 'Sem título')} ({id})")
+                print(f"  - {event.get('subject', 'Sem título')} ({id})")
         
         # Atualizar caches
-        old_google_cache = self.google_events_cache
-        old_outlook_cache = self.outlook_events_cache
-        
         self.google_events_cache = new_google_cache
         self.outlook_events_cache = new_outlook_cache
         self.last_sync_time = datetime.now()
@@ -74,13 +71,13 @@ class CalendarSynchronizer:
         return {
             'google': {
                 'added': google_added,
-                'updated': {},  # Simplificando para focar em eventos novos
-                'deleted': {}
+                'updated': google_updated,
+                'deleted': google_deleted
             },
             'outlook': {
                 'added': outlook_added,
-                'updated': {},
-                'deleted': {}
+                'updated': outlook_updated,
+                'deleted': outlook_deleted
             }
         }
     
@@ -98,58 +95,151 @@ class CalendarSynchronizer:
         }
         
         # Processar eventos adicionados no Google
-        if changes['google']['added']:
-            print(f"\nProcessando {len(changes['google']['added'])} novos eventos do Google...")
-            
         for event_id, google_event in changes['google']['added'].items():
-            print(f"Processando evento do Google: {google_event.get('summary', 'Sem título')}")
+            print(f"Processando novo evento do Google: {google_event.get('summary', 'Sem título')}")
             
-            # Verificar se já existe correspondente no Outlook
-            found = False
+            # Verificar se este evento já tem um mapeamento (para evitar duplicatas)
+            if event_id in self.google_to_outlook_map:
+                print(f"  - Já sincronizado com o Outlook com ID: {self.google_to_outlook_map[event_id]}")
+                continue
+                
+            # Verificar se este é um evento recentemente sincronizado do Outlook
+            is_synced_from_outlook = False
             for outlook_id, outlook_event in self.outlook_events_cache.items():
                 if self._events_match(google_event, outlook_event):
-                    found = True
-                    print(f"  - Evento já existe no Outlook: {outlook_event.get('subject', 'Sem título')}")
+                    print(f"  - Corresponde a um evento existente no Outlook: {outlook_event.get('subject', 'Sem título')}")
+                    self._store_event_mapping(event_id, outlook_id)
+                    is_synced_from_outlook = True
                     break
             
-            if not found:
+            if not is_synced_from_outlook:
                 try:
                     outlook_event = self._format_google_to_outlook(google_event)
                     if outlook_event:
-                        print(f"  - Convertendo para formato Outlook: {outlook_event.get('subject', 'Sem título')}")
+                        print(f"  - Criando no Outlook: {outlook_event.get('subject', 'Sem título')}")
                         result = self.outlook_sync.create_event(outlook_event)
-                        print(f"  - Criado no Outlook: {outlook_event.get('subject', 'Sem título')}")
-                        stats['google_to_outlook']['created'] += 1
+                        outlook_id = result.get('id')
+                        if outlook_id:
+                            self._store_event_mapping(event_id, outlook_id)
+                            print(f"  - Criado no Outlook com ID: {outlook_id}")
+                            stats['google_to_outlook']['created'] += 1
                 except Exception as e:
                     print(f"  - Erro ao criar evento no Outlook: {e}")
         
+        # Processar eventos atualizados no Google
+        for event_id, google_event in changes['google']['updated'].items():
+            if event_id in self.google_to_outlook_map:
+                outlook_id = self.google_to_outlook_map[event_id]
+                try:
+                    outlook_event = self._format_google_to_outlook(google_event)
+                    if outlook_event:
+                        print(f"Atualizando no Outlook: {outlook_event.get('subject', 'Sem título')}")
+                        self.outlook_sync.update_event(outlook_id, outlook_event)
+                        stats['google_to_outlook']['updated'] += 1
+                except Exception as e:
+                    print(f"Erro ao atualizar evento no Outlook: {e}")
+        
+        # Processar eventos excluídos no Google
+        for event_id, google_event in changes['google']['deleted'].items():
+            if event_id in self.google_to_outlook_map:
+                outlook_id = self.google_to_outlook_map[event_id]
+                try:
+                    print(f"Excluindo do Outlook: {google_event.get('summary', 'Sem título')}")
+                    self.outlook_sync.delete_event(outlook_id)
+                    # Remover dos mapeamentos
+                    del self.outlook_to_google_map[outlook_id]
+                    del self.google_to_outlook_map[event_id]
+                    stats['google_to_outlook']['deleted'] += 1
+                except Exception as e:
+                    print(f"Erro ao excluir evento do Outlook: {e}")
+        
         # Processar eventos adicionados no Outlook
-        if changes['outlook']['added']:
-            print(f"\nProcessando {len(changes['outlook']['added'])} novos eventos do Outlook...")
-            
         for event_id, outlook_event in changes['outlook']['added'].items():
-            print(f"Processando evento do Outlook: {outlook_event.get('subject', 'Sem título')}")
+            print(f"Processando novo evento do Outlook: {outlook_event.get('subject', 'Sem título')}")
             
-            # Verificar se já existe correspondente no Google
-            found = False
+            # Verificar se este evento já tem um mapeamento
+            if event_id in self.outlook_to_google_map:
+                print(f"  - Já sincronizado com o Google com ID: {self.outlook_to_google_map[event_id]}")
+                continue
+                
+            # Verificar se este é um evento recentemente sincronizado do Google
+            is_synced_from_google = False
             for google_id, google_event in self.google_events_cache.items():
                 if self._events_match(google_event, outlook_event):
-                    found = True
-                    print(f"  - Evento já existe no Google: {google_event.get('summary', 'Sem título')}")
+                    print(f"  - Corresponde a um evento existente no Google: {google_event.get('summary', 'Sem título')}")
+                    self._store_event_mapping(google_id, event_id)
+                    is_synced_from_google = True
                     break
             
-            if not found:
+            if not is_synced_from_google:
                 try:
                     google_event = self._format_outlook_to_google(outlook_event)
                     if google_event:
-                        print(f"  - Convertendo para formato Google: {google_event.get('summary', 'Sem título')}")
+                        print(f"  - Criando no Google: {google_event.get('summary', 'Sem título')}")
                         result = self.google_sync.create_event(google_event)
-                        print(f"  - Criado no Google: {google_event.get('summary', 'Sem título')}")
-                        stats['outlook_to_google']['created'] += 1
+                        google_id = result.get('id')
+                        if google_id:
+                            self._store_event_mapping(google_id, event_id)
+                            print(f"  - Criado no Google com ID: {google_id}")
+                            stats['outlook_to_google']['created'] += 1
                 except Exception as e:
                     print(f"  - Erro ao criar evento no Google: {e}")
         
+        # Processar eventos atualizados no Outlook
+        for event_id, outlook_event in changes['outlook']['updated'].items():
+            if event_id in self.outlook_to_google_map:
+                google_id = self.outlook_to_google_map[event_id]
+                try:
+                    google_event = self._format_outlook_to_google(outlook_event)
+                    if google_event:
+                        print(f"Atualizando no Google: {google_event.get('summary', 'Sem título')}")
+                        self.google_sync.update_event(google_id, google_event)
+                        stats['outlook_to_google']['updated'] += 1
+                except Exception as e:
+                    print(f"Erro ao atualizar evento no Google: {e}")
+        
+        # Processar eventos excluídos no Outlook
+        for event_id, outlook_event in changes['outlook']['deleted'].items():
+            if event_id in self.outlook_to_google_map:
+                google_id = self.outlook_to_google_map[event_id]
+                try:
+                    print(f"Excluindo do Google: {outlook_event.get('subject', 'Sem título')}")
+                    self.google_sync.delete_event(google_id)
+                    # Remover dos mapeamentos
+                    del self.google_to_outlook_map[google_id]
+                    del self.outlook_to_google_map[event_id]
+                    stats['outlook_to_google']['deleted'] += 1
+                except Exception as e:
+                    print(f"Erro ao excluir evento do Google: {e}")
+        
         return stats
+    
+    def _is_event_updated(self, current_event, cached_event):
+        """Verifica se um evento foi atualizado comparando campos relevantes"""
+        # Para Google
+        if 'updated' in current_event and 'updated' in cached_event:
+            return current_event['updated'] != cached_event['updated']
+        
+        # Para Outlook
+        if 'lastModifiedDateTime' in current_event and 'lastModifiedDateTime' in cached_event:
+            return current_event['lastModifiedDateTime'] != cached_event['lastModifiedDateTime']
+        
+        # Comparação manual de campos importantes
+        important_fields = ['summary', 'subject', 'start', 'end', 'location', 'description']
+        
+        for field in important_fields:
+            if field in current_event and field in cached_event:
+                # Para campos aninhados como start e end
+                if isinstance(current_event[field], dict) and isinstance(cached_event[field], dict):
+                    # Comparar dateTime para campos de data/hora
+                    if 'dateTime' in current_event[field] and 'dateTime' in cached_event[field]:
+                        if current_event[field]['dateTime'] != cached_event[field]['dateTime']:
+                            return True
+                # Para campos simples
+                elif current_event[field] != cached_event[field]:
+                    return True
+        
+        return False
     
     def _events_match(self, google_event, outlook_event):
         """Verifica se um evento do Google corresponde a um evento do Outlook"""
@@ -161,7 +251,9 @@ class CalendarSynchronizer:
             return False
             
         title_match = google_title.lower() == outlook_title.lower()
-        
+        if not title_match:
+            return False
+            
         # Comparar data/hora de início
         google_start = google_event.get('start', {}).get('dateTime', '')
         outlook_start = outlook_event.get('start', {}).get('dateTime', '')
@@ -169,21 +261,16 @@ class CalendarSynchronizer:
         if not google_start or not outlook_start:
             return False
             
-        time_match = False
         try:
             google_dt = datetime.fromisoformat(google_start.replace('Z', '+00:00'))
             outlook_dt = datetime.fromisoformat(outlook_start.replace('Z', '+00:00'))
             time_diff = abs((google_dt - outlook_dt).total_seconds())
-            time_match = time_diff < 300  # 5 minutos de tolerância
-        except (ValueError, TypeError) as e:
-            print(f"Erro ao comparar datas: {e}")
+            if time_diff > 300:  # 5 minutos de tolerância
+                return False
+        except (ValueError, TypeError):
             return False
             
-        if title_match and time_match:
-            print(f"Evento correspondente encontrado: '{google_title}' = '{outlook_title}'")
-            return True
-            
-        return False
+        return True
     
     def start_realtime_sync(self, interval=20):
         """Inicia sincronização em tempo real a cada 'interval' segundos"""
@@ -191,7 +278,7 @@ class CalendarSynchronizer:
         print("Monitorando apenas mudanças (criações, atualizações, exclusões)")
         print("Pressione Ctrl+C para interromper")
         
-        # Inicializar caches
+        # Inicializar caches e mapeamentos
         self._update_caches()
         print("Estado inicial dos calendários armazenado. Monitorando mudanças...")
         
@@ -231,11 +318,9 @@ class CalendarSynchronizer:
     
     def _format_google_to_outlook(self, google_event):
         """Converte um evento do Google para o formato do Outlook"""
-        # Verificar se o evento tem os campos necessários
         if not google_event.get('summary') or not google_event.get('start'):
             return None
             
-        # Criar evento no formato do Outlook
         outlook_event = {
             'subject': google_event.get('summary'),
             'body': {
@@ -252,7 +337,6 @@ class CalendarSynchronizer:
             }
         }
         
-        # Adicionar localização se disponível
         if google_event.get('location'):
             outlook_event['location'] = {
                 'displayName': google_event.get('location')
@@ -262,11 +346,9 @@ class CalendarSynchronizer:
     
     def _format_outlook_to_google(self, outlook_event):
         """Converte um evento do Outlook para o formato do Google"""
-        # Verificar se o evento tem os campos necessários
         if not outlook_event.get('subject') or not outlook_event.get('start'):
             return None
             
-        # Criar evento no formato do Google
         google_event = {
             'summary': outlook_event.get('subject'),
             'description': outlook_event.get('body', {}).get('content', 'Evento sincronizado do Outlook Calendar'),
@@ -280,8 +362,40 @@ class CalendarSynchronizer:
             }
         }
         
-        # Adicionar localização se disponível
         if outlook_event.get('location'):
             google_event['location'] = outlook_event.get('location', {}).get('displayName', '')
             
         return google_event
+
+    def _is_event_updated(self, current_event, cached_event):
+        """Checks if an event has been updated by comparing relevant fields"""
+        # For Google
+        if 'updated' in current_event and 'updated' in cached_event:
+            return current_event['updated'] != cached_event['updated']
+        
+        # For Outlook
+        if 'lastModifiedDateTime' in current_event and 'lastModifiedDateTime' in cached_event:
+            return current_event['lastModifiedDateTime'] != cached_event['lastModifiedDateTime']
+        
+        # Manual comparison of important fields
+        important_fields = ['summary', 'subject', 'start', 'end', 'location', 'description']
+        
+        for field in important_fields:
+            if field in current_event and field in cached_event:
+                # Para campos aninhados como start e end
+                if isinstance(current_event[field], dict) and isinstance(cached_event[field], dict):
+                    # Comparar dateTime para campos de data/hora
+                    if 'dateTime' in current_event[field] and 'dateTime' in cached_event[field]:
+                        if current_event[field]['dateTime'] != cached_event[field]['dateTime']:
+                            return True
+                # Para campos simples
+                elif current_event[field] != cached_event[field]:
+                    return True
+        
+        return False
+        
+    def _store_event_mapping(self, google_id, outlook_id):
+        """Armazena o mapeamento entre IDs de eventos do Google e Outlook"""
+        print(f"Mapeando evento: Google ID {google_id} <-> Outlook ID {outlook_id}")
+        self.google_to_outlook_map[google_id] = outlook_id
+        self.outlook_to_google_map[outlook_id] = google_id

@@ -3,7 +3,6 @@ import requests
 import json
 import msal
 import webbrowser
-# Make sure to add this import at the top
 from datetime import datetime, timedelta
 
 class OutlookCalendarSync:
@@ -138,7 +137,9 @@ class OutlookCalendarSync:
             print(error_message)  # Imprimir o erro para debug
             raise Exception(error_message)
 
-    def create_event(self, event):
+    # Certifique-se de que o método create_event retorna o evento criado com seu ID
+    def create_event(self, event_data):
+        """Cria um evento no Outlook Calendar"""
         if not self.calendar_id:
             raise Exception("ID do calendário não definido. Use set_calendar_id() primeiro.")
             
@@ -147,9 +148,12 @@ class OutlookCalendarSync:
             'Authorization': f'Bearer {self.token}',
             'Content-Type': 'application/json'
         }
-        response = requests.post(url, headers=headers, data=json.dumps(event))
-        if response.status_code in (200, 201):
-            return response.json()
+        
+        response = requests.post(url, headers=headers, json=event_data)
+        if response.status_code == 201:  # 201 Created
+            created_event = response.json()
+            print(f"Evento criado no Outlook Calendar: {created_event.get('subject', 'Sem título')}")
+            return created_event  # Retorna o evento criado com seu ID
         else:
             error_message = f"Erro ao criar evento na API do Outlook. Status: {response.status_code}, Resposta: {response.text}"
             print(error_message)

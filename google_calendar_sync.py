@@ -67,10 +67,16 @@ class GoogleCalendarSync:
             
         return events
 
-    def create_event(self, event):
-        # Cria um novo evento
-        created_event = self.service.events().insert(calendarId=self.calendar_id, body=event).execute()
-        return created_event
+    # Certifique-se de que o método create_event retorna o evento criado com seu ID
+    def create_event(self, event_data):
+        """Cria um evento no Google Calendar"""
+        try:
+            event = self.service.events().insert(calendarId=self.calendar_id, body=event_data).execute()
+            print(f"Evento criado no Google Calendar: {event.get('summary', 'Sem título')}")
+            return event  # Retorna o evento criado com seu ID
+        except Exception as e:
+            print(f"Erro ao criar evento no Google Calendar: {e}")
+            raise e
 
     def update_event(self, event_id, event):
         """Atualiza um evento existente"""
