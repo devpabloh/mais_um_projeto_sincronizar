@@ -4,6 +4,8 @@ from google.auth.transport.requests import Request
 from google.oauth2.credentials import Credentials
 from google_auth_oauthlib.flow import InstalledAppFlow
 from googleapiclient.discovery import build
+from datetime import datetime, timedelta
+import os.path
 
 class GoogleCalendarSync:
     # Define SCOPES as a class attribute
@@ -36,17 +38,53 @@ class GoogleCalendarSync:
         # Construa o serviço
         return build('calendar', 'v3', credentials=creds)
 
-    def list_events(self):
-        # Exemplo de listagem de eventos
+    def list_events(self, from_date=None):
+        """Lista eventos a partir de uma data específica"""
+        # Se from_date não for fornecido, usar a data atual
+        if from_date is None:
+            from_date = datetime.now().replace(hour=0, minute=0, second=0, microsecond=0)
+            
+        # Converter para formato ISO
+        time_min = from_date.isoformat() + 'Z'  # 'Z' indica UTC
+        
+        print(f"Buscando eventos do Google a partir de: {from_date.strftime('%d/%m/%Y')}")
+        
+        # Listar eventos
         events_result = self.service.events().list(
             calendarId=self.calendar_id,
+            timeMin=time_min,
+            maxResults=100,  # Aumentar para pegar mais eventos
             singleEvents=True,
             orderBy='startTime'
         ).execute()
+        
         events = events_result.get('items', [])
+        print(f"Encontrados {len(events)} eventos no Google Calendar")
+        
+        # Debug: mostrar os eventos encontrados
+        for event in events:
+            print(f"  - Google Event: {event.get('summary', 'Sem título')} (ID: {event.get('id', 'N/A')})")
+            
         return events
 
     def create_event(self, event):
         # Cria um novo evento
         created_event = self.service.events().insert(calendarId=self.calendar_id, body=event).execute()
         return created_event
+
+    def update_event(self, event_id, event):
+        """Atualiza um evento existente"""
+        updated_event = self.service.events().update(
+            calendarId=self.calendar_id,
+            eventId=event_id,
+            body=event
+        ).execute()
+        return updated_event
+        
+    def delete_event(self, event_id):
+        """Exclui um evento"""
+        self.service.events().delete(
+            calendarId=self.calendar_id,
+            eventId=event_id
+        ).execute()
+        return True

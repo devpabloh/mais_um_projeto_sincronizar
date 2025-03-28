@@ -3,6 +3,8 @@ import requests
 import json
 import msal
 import webbrowser
+# Make sure to add this import at the top
+from datetime import datetime, timedelta
 
 class OutlookCalendarSync:
     def __init__(self, client_id, client_secret, tenant_id, redirect_uri=None):
@@ -93,18 +95,42 @@ class OutlookCalendarSync:
         """Definir o ID do calendário a ser usado"""
         self.calendar_id = calendar_id
 
-    def list_events(self):
+    def list_events(self, from_date=None):
+        """Lista eventos a partir de uma data específica"""
         if not self.calendar_id:
             raise Exception("ID do calendário não definido. Use set_calendar_id() primeiro.")
+        
+        # Se from_date não for fornecido, usar a data atual
+        if from_date is None:
+            from_date = datetime.now().replace(hour=0, minute=0, second=0, microsecond=0)
             
         url = f"https://graph.microsoft.com/v1.0/me/calendars/{self.calendar_id}/events"
         headers = {
             'Authorization': f'Bearer {self.token}',
             'Content-Type': 'application/json'
         }
-        response = requests.get(url, headers=headers)
+        
+        # Converter a data para formato ISO 8601
+        start_datetime = from_date.isoformat()
+        
+        # Filtrar eventos que começam após a data especificada
+        params = {
+            '$filter': f"start/dateTime ge '{start_datetime}'",
+            '$orderby': 'start/dateTime asc',
+            '$top': 100  # Limitar número de resultados para melhor performance
+        }
+        
+        print(f"Buscando eventos do Outlook a partir de: {from_date.strftime('%d/%m/%Y')}")
+        
+        response = requests.get(url, headers=headers, params=params)
         if response.status_code == 200:
             events = response.json().get('value', [])
+            print(f"Encontrados {len(events)} eventos no Outlook Calendar")
+            
+            # Debug: mostrar os eventos encontrados
+            for event in events:
+                print(f"  - Outlook Event: {event.get('subject', 'Sem título')} (ID: {event.get('id', 'N/A')})")
+                
             return events
         else:
             # Adicionar mais detalhes sobre o erro
@@ -126,5 +152,35 @@ class OutlookCalendarSync:
             return response.json()
         else:
             error_message = f"Erro ao criar evento na API do Outlook. Status: {response.status_code}, Resposta: {response.text}"
+            print(error_message)
+            raise Exception(error_message)
+
+    def update_event(self, event_id, event):
+        """Atualiza um evento existente"""
+        url = f"https://graph.microsoft.com/v1.0/me/calendars/{self.calendar_id}/events/{event_id}"
+        headers = {
+            'Authorization': f'Bearer {self.token}',
+            'Content-Type': 'application/json'
+        }
+        response = requests.patch(url, headers=headers, data=json.dumps(event))
+        if response.status_code in (200, 201, 204):
+            return response.json() if response.text else {}
+        else:
+            error_message = f"Erro ao atualizar evento na API do Outlook. Status: {response.status_code}, Resposta: {response.text}"
+            print(error_message)
+            raise Exception(error_message)
+            
+    def delete_event(self, event_id):
+        """Exclui um evento"""
+        url = f"https://graph.microsoft.com/v1.0/me/calendars/{self.calendar_id}/events/{event_id}"
+        headers = {
+            'Authorization': f'Bearer {self.token}',
+            'Content-Type': 'application/json'
+        }
+        response = requests.delete(url, headers=headers)
+        if response.status_code in (200, 201, 204):
+            return True
+        else:
+            error_message = f"Erro ao excluir evento na API do Outlook. Status: {response.status_code}, Resposta: {response.text}"
             print(error_message)
             raise Exception(error_message)

@@ -1,6 +1,8 @@
-# importando os arquivos que contém a classe GoogleCalendarSync
+# importando os arquivos que contém as classes necessárias
 from google_calendar_sync import GoogleCalendarSync 
-from outlook_calendar_sync import OutlookCalendarSync 
+from outlook_calendar_sync import OutlookCalendarSync
+from calendar_synchronizer import CalendarSynchronizer
+from datetime import datetime, timedelta
 
 def main():
     # CONFIGURANDO O GOOGLE CALENDAR
@@ -31,29 +33,18 @@ def main():
     # Definir o ID do calendário do Outlook
     outlook_sync.set_calendar_id(outlook_calendar_id)
     
-    # Listar eventos do Google
-    try:
-        print("\n=== Eventos do Google Calendar ===")
-        google_events = google_sync.list_events()
-        if google_events:
-            for event in google_events:
-                print(f" - {event.get('summary', 'Sem título')} ({event.get('start', {}).get('dateTime', 'Sem data')})")
-        else:
-            print("Nenhum evento encontrado no calendário do Google.")
-    except Exception as e:
-        print(f"Erro ao listar eventos do Google: {e}")
+    # Criar o sincronizador
+    synchronizer = CalendarSynchronizer(google_sync, outlook_sync)
     
-    # Listar eventos do Outlook
-    try:
-        print("\n=== Eventos do Outlook Calendar ===")
-        outlook_events = outlook_sync.list_events()
-        if outlook_events:
-            for event in outlook_events:
-                print(f" - {event.get('subject', 'Sem título')} ({event.get('start', {}).get('dateTime', 'Sem data')})")
-        else:
-            print("Nenhum evento encontrado no calendário do Outlook.")
-    except Exception as e:
-        print(f"Erro ao listar eventos do Outlook: {e}")
+    print("\n=== Iniciando sincronização em tempo real ===")
+    print("Este modo irá:")
+    print("- Monitorar apenas as mudanças em ambos os calendários")
+    print("- Sincronizar apenas eventos novos, atualizados ou excluídos")
+    print("- Não duplicar eventos existentes")
+    print("- Verificar mudanças a cada 20 segundos")
+    
+    # Iniciar sincronização em tempo real
+    synchronizer.start_realtime_sync(interval=20)
 
 if __name__ == "__main__":
     main()
