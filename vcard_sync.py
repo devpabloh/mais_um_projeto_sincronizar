@@ -26,7 +26,7 @@ class VcardSync:
       self.driver.find_element(By.ID, "calendarid").click()
       time.sleep(3)
       #localizando o campo de upload
-      file_input = self.driver.find_element(By.ID, '{button_id}')
+      file_input = self.driver.find_element(By.ID, '//input[@value="importar"]')
       file_input.send_keys(file_path)
       time.sleep(3)
       submit_button = self.driver.find_element(By.XPATH, '//button[@type="submit"]').click()
