@@ -13,25 +13,25 @@ class VcardSync:
         self.login()
 
     def login(self):
-      self.driver.get(self.base_url)
-      time.sleep(2)
-      username_field = self.driver.find_element(By.ID, "user")
-      password_field = self.driver.find_element(By.ID, "passwd")
-      username_field.send_keys(self.username)
-      password_field.send_keys(self.password)
-      password_field.send_keys(Keys.RETURN)
-      time.sleep(3)
+        self.driver.get(self.base_url)
+        time.sleep(2)
+        username_field = self.driver.find_element(By.ID, "user")
+        password_field = self.driver.find_element(By.ID, "passwd")
+        username_field.send_keys(self.username)
+        password_field.send_keys(self.password)
+        password_field.send_keys(Keys.RETURN)
+        time.sleep(3)
 
     def import_vcard(self, file_path):
-      self.driver.find_element(By.ID, "calendarid").click()
-      time.sleep(3)
-      #localizando o campo de upload
-      file_input = self.driver.find_element(By.ID, '//input[@value="importar"]')
-      file_input.send_keys(file_path)
-      time.sleep(3)
-      submit_button = self.driver.find_element(By.XPATH, '//button[@type="submit"]').click()
-      time.sleep(3)
-      print("Arquivo vCard importado com sucesso.")
+        self.driver.find_element(By.ID, "calendarid").click()
+        time.sleep(3)
+        #localizando o campo de upload
+        file_input = self.driver.find_element(By.ID, '//input[@value="importar"]')
+        file_input.send_keys(file_path)
+        time.sleep(3)
+        submit_button = self.driver.find_element(By.XPATH, '//button[@type="submit"]').click()
+        time.sleep(3)
+        print("Arquivo vCard importado com sucesso.")
 
     def create_event(self, event_data):
         #Criando evento via formulário web
@@ -54,7 +54,7 @@ class VcardSync:
         submit_button = self.driver.find_element(By.ID, "submit_button").click()
         time.sleep(3)
         print("Evento criado com sucesso.")
-      
+
     def update_event(self, event_id, event_data):
         #Atualizando evento via formulário web
         self.driver.get(f"{self.base_url}/index.php?menuaction=calendar.uicalendar.view&cal_id={event_id}&date={date}")
@@ -92,6 +92,6 @@ class VcardSync:
 
     def close(self):
         self.driver.quit()
-      
+
         
         
