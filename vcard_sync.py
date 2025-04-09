@@ -15,8 +15,8 @@ class VcardSync:
     def login(self):
         self.driver.get(self.base_url)
         time.sleep(2)
-        username_field = self.driver.find_element(By.ID, "user")
-        password_field = self.driver.find_element(By.ID, "passwd")
+        username_field = self.driver.find_element(By.ID, "pablo.henrique")
+        password_field = self.driver.find_element(By.ID, "@Taisatt84671514")
         username_field.send_keys(self.username)
         password_field.send_keys(self.password)
         password_field.send_keys(Keys.RETURN)

@@ -1,0 +1,890 @@
+<html xml:lang="pt-br" xmlns="http://www.w3.org/1999/xhtml"><head>
+		<title>Expresso Livre [Agenda de Eventos]</title>
+		<meta http-equiv="content-type" content="text/html; charset=iso-8859-1">
+		<meta name="keywords" content="eGroupWare">
+		<meta name="description" content="eGroupware">
+		<meta name="keywords" content="eGroupWare">
+		<meta name="copyright" content="eGroupWare http://www.egroupware.org (c) 2003">
+		<meta name="language" content="pt-br">
+		<meta name="author" content="eGroupWare http://www.egroupware.org">
+		<meta name="robots" content="none">
+		<link rel="icon" href="/calendar/templates/default/images/navbar.png" type="image/x-ico">
+		<meta http-equiv="Default-Style" content="eGroupWareStyle">
+		
+		<script src="/phpgwapi/templates/default/js/simple_show_hide.js" type="text/javascript">
+		</script>
+		<!-- This solves the Internet Explorer PNG-transparency bug, but only for IE 5.5 and higher --> 
+		<!--[if lt IE 7]>
+		<script src="/phpgwapi/templates/default/js/pngfix.js" type="text/javascript">
+		</script>
+		<![endif]-->
+		<style type="text/css">
+<!--
+	.row_on { color: #000000; background-color: #f4f8fb; }
+	.row_off { color: #000000; background-color: #ffffff; }
+	.th { color: #000000; background-color: #D3DCE3; }
+	
+-->
+</style>
+<link href="/phpgwapi/templates/default/css/base.css" type="text/css" rel="StyleSheet"><link href="/phpgwapi/templates/default/css/azul.css" type="text/css" rel="StyleSheet"><link href="/calendar/templates/default/app.css" type="text/css" rel="StyleSheet">
+
+		
+		<script src="/phpgwapi/templates/default/js/cookieManager.js" type="text/javascript"></script>
+	</head>
+	<!-- we don't need body tags anymore, do we?) we do!!! onload!! LK -->
+	<body bgcolor="#FFFFFF" alink="red" link="blue" vlink="blue">
+<div align="center" id="hiddenButton" style="position: absolute; top: 55px; left: 2px;"><a title="Esconder cabeçalho e barra de ferramentas" onclick="javascript:changeBar()"><img src="/phpgwapi/templates/default/images/up.button.png"></a></div>
+<div align="center" id="extraButton" style="position: absolute; visibility: hidden;">
+<table><tbody><tr><td width="26" valign="top" align="right" style="zIndex:10000;padding-right:3px;padding-top:10px;"><a title="Exibir mais Aplicativos" href="#" onclick="ypSlideOutMenu.showMenu('menu1')"><img src="/phpgwapi/templates/default/images/extra_icons.png" border="0"></a></td></tr></tbody></table>
+</div>
+
+				<script language="javascript">
+				new ypSlideOutMenu("menu1", "down", 5, 24, 160, 200,'left')
+				</script><style type="text/css">#menu1Container { visibility:hidden; left:5px; top:24px; overflow:visible; z-index:10000; }#menu1Container, #menu1Content { position:absolute; width:160px; }</style>
+				<div id="menu1Container">
+				<div id="menu1Content" style="position: relative; left: 0; text-align: left;">
+
+				<div id="extraIcons">
+
+				<table cellspacing="0" cellpadding="0" border="0" width="100%">
+				<tbody><tr>
+				<td colspan="2" nowrap="nowrap" align="right" style="background-color:#dddddd;padding:1px;">
+				<a href="#" onclick="ypSlideOutMenu.hide('menu1')" title="Fechar">
+				<img style="" border="0" src="/phpgwapi/templates/default/images/close.png"></a></td></tr>
+				<tr>
+				<td colspan="1" valign="top" nowrap="nowrap" align="left" style="background-color:#dddddd;padding:1px;">
+					<a href="#" onclick="javascript:ypSlideOutMenu.hide('menu1');showBar()" title="Expandir Menu">
+					<img src="/phpgwapi/templates/default/images/down.button.png"></a>
+				</td>
+				<td colspan="1" valign="top" nowrap="nowrap" align="left" style="background-color:#dddddd;padding:1px;">
+					<a href="#" onclick="javascript:ypSlideOutMenu.hide('menu1');showBar()" title="Expandir Menu">
+					<b>Expandir Menu</b></a></td></tr>				
+				<tr><td class="extraIconsRow"><a href="/home.php"><img align="center" src="/phpgwapi/templates/default/images/home.png" alt="" width="16" title="" border="0"></a></td><td align="left" class="extraIconsRow" style=""><a href="/home.php">Página Inicial</a></td></tr><tr><td class="extraIconsRow"><a href="/expressoMail1_2/index.php"><img align="center" src="/expressoMail1_2/templates/default/images/navbar.png" alt="" width="16" title="" border="0"></a></td><td align="left" class="extraIconsRow" style=""><a href="/expressoMail1_2/index.php">Expresso Mail</a></td></tr><tr><td class="extraIconsRow"><a href="/calendar/index.php"><img align="center" src="/calendar/templates/default/images/navbar.png" alt="" width="16" title="" border="0"></a></td><td align="left" class="extraIconsRow" style=""><a href="/calendar/index.php">Agenda de Eventos</a></td></tr><tr><td class="extraIconsRow"><a href="/contactcenter/index.php"><img align="center" src="/contactcenter/templates/default/images/navbar.png" alt="" width="16" title="" border="0"></a></td><td align="left" class="extraIconsRow" style=""><a href="/contactcenter/index.php">Catálogo de Endereços</a></td></tr><tr><td class="extraIconsRow"><a href="/news_admin/index.php"><img align="center" src="/news_admin/templates/default/images/navbar.png" alt="" width="16" title="" border="0"></a></td><td align="left" class="extraIconsRow" style=""><a href="/news_admin/index.php">Boletins Internos</a></td></tr><tr><td class="extraIconsRow">
+				<a href="/logout.php"><img src="/phpgwapi/templates/default/images/logout.png" alt="Desconectar" title="Desconectar"></a></td><td class="extraIconsRow">
+				<a href="/logout.php">Desconectar</a></td></tr></tbody></table>
+				</div>
+
+				</div>
+				</div>
+				
+<script language="Javascript">	 
+	function showBar(){
+		bar = document.getElementById("toolbar");	
+		bar.style.visibility = "";
+		bar.style.position ="static";
+		but = document.getElementById("hiddenButton");		
+		but.style.visibility = "";
+		but.style.position = "absolute";		
+		but.style.top = "55px";		
+		but.style.left = "2px";		
+		title = "Esconder cabeçalho e barra de ferramentas";
+		extra = document.getElementById("extraButton");
+		extra.style.visibility = "hidden";		
+		but.innerHTML="<a title='"+title+"' onClick='javascript:changeBar()'><img src='/phpgwapi/templates/default/images/up.button.png'></a>";
+		var neverExpires = new Date("January 01, 2100 00:00:00");
+ 		document.cookie = "showHeader=true"+
+ 						  ";expires=" + neverExpires.toGMTString()+
+ 						  ";path=/";
+	}
+
+	function hideBar(){
+		bar = document.getElementById("toolbar");	
+		bar.style.position ="absolute";
+		bar.style.visibility = "hidden";
+		but = document.getElementById("hiddenButton");		
+		but.style.visibility = "hidden";
+		title = "Exibir cabeçalho e barra de ferramentas";
+		extra = document.getElementById("extraButton");
+		extra.style.visibility = ""
+		extra.style.top = "-11px";		
+		extra.style.left = "-10px";		
+		var neverExpires = new Date("January 01, 2100 00:00:00");
+ 		document.cookie = "showHeader=false"+
+ 						  ";expires=" + neverExpires.toGMTString()+
+ 						  ";path=/";
+	}
+	function changeBar(){
+		bar = document.getElementById("toolbar");			
+		if(bar.style.visibility == "hidden")
+			showBar();		
+		else
+			hideBar();
+	}
+	function initBar(val){
+
+		if(val == 'true')
+			showBar();		
+		else
+			hideBar();		
+	}
+var zoominTimer = new Array();
+var zoomoutTimer = new Array();
+function zoom_in(id)
+{
+	clearTimeout(zoomoutTimer[id]);
+	var elem = document.getElementById(id);
+	if (elem.height > 34)
+	{
+		clearTimeout(zoominTimer[id]);
+		return false;
+	}	
+	elem.height += 4;
+	elem.width += 4;
+	zoominTimer[id] = setTimeout('zoom_in("'+id+'");',30);
+}
+function zoom_out(id)
+{
+	clearTimeout(zoominTimer[id]);		
+	var elem = document.getElementById(id);
+	if (elem.height < 24)
+	{
+		clearTimeout(zoomoutTimer[id]);
+		return false;
+	}	
+	elem.height -= 2;
+	elem.width -= 2;
+	zoomoutTimer[id] = setTimeout('zoom_out("'+id+'");',30);
+}
+</script>
+
+<div class="toolbar" id="toolbar" style="position: static;">
+<table border="0" height="50px" width="100%" cellpadding="0" cellspacing="0"><tbody><tr>
+	<td class="logo_expresso">&nbsp;<br></td>
+	<td align="center">
+	<table width="auto" border="0" cellpadding="0" cellspacing="0"><tbody><tr><td nowrap="" onmouseover="javascript:this.className='navbar_butOver'; zoom_in(this.firstChild.firstChild.id)" onmouseout="javascript:this.className='navbar_but'; zoom_out(this.firstChild.firstChild.id)" class="navbar_but"><a href="/home.php"><img id="homeid" src="/phpgwapi/templates/default/images/home.png" alt="Página Inicial" title="Página Inicial" border="0" width="24" height="24" nowrap="nowrap"></a></td><td nowrap="" onmouseover="javascript:this.className='navbar_butOver'; zoom_in(this.firstChild.firstChild.id)" onmouseout="javascript:this.className='navbar_but'; zoom_out(this.firstChild.firstChild.id)" class="navbar_but"><a href="/expressoMail1_2/index.php"><img id="expressoMail12id" src="/expressoMail1_2/templates/default/images/navbar.png" alt="Expresso Mail" title="Expresso Mail" border="0" width="24" height="24" nowrap="nowrap"></a></td><td nowrap="" onmouseover="javascript:return true;this.className='navbar_butOver'; zoom_in(this.firstChild.firstChild.id)" onmouseout="javascript:return true;this.className='navbar_but'; " class="navbar_butOut"><a href="/calendar/index.php"><img id="calendarid" src="/calendar/templates/default/images/navbar.png" alt="Agenda de Eventos" title="Agenda de Eventos" border="0" width="35" height="35" nowrap="nowrap"></a></td><td nowrap="" onmouseover="javascript:this.className='navbar_butOver'; zoom_in(this.firstChild.firstChild.id)" onmouseout="javascript:this.className='navbar_but'; zoom_out(this.firstChild.firstChild.id)" class="navbar_but"><a href="/contactcenter/index.php"><img id="contactcenterid" src="/contactcenter/templates/default/images/navbar.png" alt="Catálogo de Endereços" title="Catálogo de Endereços" border="0" width="24" height="24" nowrap="nowrap"></a></td><td nowrap="" onmouseover="javascript:this.className='navbar_butOver'; zoom_in(this.firstChild.firstChild.id)" onmouseout="javascript:this.className='navbar_but'; zoom_out(this.firstChild.firstChild.id)" class="navbar_but"><a href="/news_admin/index.php"><img id="newsadminid" src="/news_admin/templates/default/images/navbar.png" alt="Boletins Internos" title="Boletins Internos" border="0" width="24" height="24" nowrap="nowrap"></a></td><td nowrap="" onmouseover="javascript:this.className='navbar_butOver'; zoom_in(this.firstChild.firstChild.id)" onmouseout="javascript:this.className='navbar_but'; zoom_out(this.firstChild.firstChild.id)" class="navbar_but"><a onclick="location.href='/logout.php'"><img id="logout_id" width="24" height="24" src="/phpgwapi/templates/default/images/logout.png" alt="Desconectar" title="Desconectar"></a></td></tr></tbody></table>
+	</td><td style="padding-left:0px;padding-right:25px" align="right" nowrap="">
+</td></tr></tbody></table>
+<div id="divStatusBar">
+<table width="100%" border="0" cellspacing="0" cellpadding="0">
+ <tbody><tr>
+  <td width="30%" align="left" id="user_info" nowrap=""><b>Pablo Henrique Ferreira de Franca [pablo.henrique1]</b> - Quarta-Feira 09/04/2025</td>
+  <td width="30%" id="admin_info" nowrap=""></td>
+  <td style="padding-right:10px" width="*" align="right" valign="center" nowrap="true">
+  		<a href="/preferences/" title="Clique aqui para alterar sua senha do Expresso e outras preferências" alt="Clique aqui para alterar sua senha do Expresso e outras preferências" onmouseover="javascript:self.status='Clique aqui para alterar sua senha do Expresso e outras preferências'" onmouseout="javascript:self.status=''"><img height="15px" src="/phpgwapi/templates/default/images/preferences.png"><font id="links_bar">Minhas Preferências</font></a>
+  		&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; 
+<!--  		<a href="#" title="Envie suas críticas, dúvidas ou sugestões" alt="Envie suas críticas, dúvidas ou sugestões" onmouseover="javascript:self.status='Envie suas críticas, dúvidas ou sugestões'" onmouseout="javascript:self.status=''" onclick="javascript:openWindow(400,550,'/help/enviasugestao.php')"><img src="/phpgwapi/templates/default/images/critic.png"><font id="links_bar">Sugestões</font></a> -->
+  		&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+  		<a href="#" title="Clique aqui para ajuda" alt="Clique aqui para ajuda" onmouseover="javascript:self.status='Clique aqui para ajuda'" onmouseout="javascript:self.status=''" onclick="javascript:openWindow(480,510,'/help/')"><img src="/phpgwapi/templates/default/images/help.png" width="16px"><font id="links_bar">Ajuda</font></a>
+  </td>
+ </tr>
+</tbody></table>
+</div>
+</div>
+
+<script language="Javascript">
+ function openWindow(newWidth,newHeight,link)
+  {			
+		
+	newScreenX  = screen.width - newWidth;	
+	newScreenY  = 0;		
+	Window1=window.open(link,'',"width="+newWidth+",height="+newHeight+",screenX="+newScreenX+",left="+newScreenX+",screenY="+newScreenY+",top="+newScreenY+",toolbar=no,scrollbars=yes,resizable=no");
+				
+  }	
+</script>
+	<script language="javascript">
+		new ypSlideOutMenu("menu2", "right", 0, 165, 160, 200)
+	</script><style type="text/css">#menu2Container { visibility:hidden; left:0px; top:165px; overflow:visible; z-index:10000; }#menu2Container, #menu2Content { position:absolute; width:160px; }</style>
+
+	<div id="sideboxdragarea" style="position:absolute;left:0px;top:175px">
+	<a href="#" onclick="ypSlideOutMenu.showMenu('menu2')" onmouseover="//ypSlideOutMenu.showMenu('menu2')" title="Mostrar menu"><img src="/phpgwapi/templates/default/images/dragarea_right.png"></a>
+	</div>
+	<div id="menu2Container">
+	<div id="menu2Content" style="position: relative; left: 0; text-align: left;">
+		<table cellspacing="0" cellpadding="0" border="0">
+		 <tbody><tr><td>
+		  
+		<div style="background-color:#ffffff;border: #9c9c9c 1px solid;padding:5px;">
+<div class="divSidebox">
+	<div class="divSideboxHeader"><span>Menu Geral</span></div>
+	<div>
+		<table width="100%" cellspacing="0" cellpadding="0" border="0">
+<tbody><tr class="divSideboxEntry">
+<td width="15" align="center" valign="middle" class="textSidebox"><img src="/phpgwapi/templates/default/images/orange-ball.png" width="9" height="9" alt="ball"></td><td class="textSidebox"><a class="textSidebox" href="/home.php">Página Inicial</a></td></tr>
+<tr class="divSideboxEntry">
+<td width="15" align="center" valign="middle" class="textSidebox"><img src="/phpgwapi/templates/default/images/orange-ball.png" width="9" height="9" alt="ball"></td><td class="textSidebox"><a class="textSidebox" href="/preferences/index.php">Preferências</a></td></tr>
+<tr class="divSideboxEntry">
+<td width="15" align="center" valign="middle" class="textSidebox"><img src="/phpgwapi/templates/default/images/orange-ball.png" width="9" height="9" alt="ball"></td><td class="textSidebox"><a class="textSidebox" href="/about.php?app=calendar">Sobre Agenda de Eventos</a></td></tr>
+<tr class="divSideboxEntry">
+<td width="15" align="center" valign="middle" class="textSidebox"><img src="/phpgwapi/templates/default/images/orange-ball.png" width="9" height="9" alt="ball"></td><td class="textSidebox"><a class="textSidebox" href="/logout.php">Desconectar</a></td></tr>
+	</tbody></table>	
+		</div>
+		</div>
+		<div class="sideboxSpace"></div>
+<div class="divSidebox">
+	<div class="divSideboxHeader"><span>Agenda de Eventos Menu</span></div>
+	<div>
+		<table width="100%" cellspacing="0" cellpadding="0" border="0">
+<tbody><tr class="divSideboxEntry">
+<td width="15" align="center" valign="middle" class="textSidebox"><img src="/phpgwapi/templates/default/images/orange-ball.png" width="9" height="9" alt="ball"></td><td class="textSidebox"><a class="textSidebox" href="/index.php?menuaction=calendar.uicalendar.add">Nova Entrada</a></td></tr>
+<tr class="divSideboxEntry"> 
+	<td colspan="2" height="8" class="textSidebox">&nbsp;</td>
+</tr>
+<tr class="divSideboxEntry">
+<td width="15" align="center" valign="middle" class="textSidebox"><img src="/phpgwapi/templates/default/images/orange-ball.png" width="9" height="9" alt="ball"></td><td class="textSidebox"><a class="textSidebox" href="/index.php?menuaction=calendar.uicalendar.day">Hoje</a></td></tr>
+<tr class="divSideboxEntry">
+<td width="15" align="center" valign="middle" class="textSidebox"><img src="/phpgwapi/templates/default/images/orange-ball.png" width="9" height="9" alt="ball"></td><td class="textSidebox"><a class="textSidebox" href="/index.php?menuaction=calendar.uicalendar.week">Esta Semana</a></td></tr>
+<tr class="divSideboxEntry">
+<td width="15" align="center" valign="middle" class="textSidebox"><img src="/phpgwapi/templates/default/images/orange-ball.png" width="9" height="9" alt="ball"></td><td class="textSidebox"><a class="textSidebox" href="/index.php?menuaction=calendar.uicalendar.month">Este mês</a></td></tr>
+<tr class="divSideboxEntry">
+<td width="15" align="center" valign="middle" class="textSidebox"><img src="/phpgwapi/templates/default/images/orange-ball.png" width="9" height="9" alt="ball"></td><td class="textSidebox"><a class="textSidebox" href="/index.php?menuaction=calendar.uicalendar.year">Este ano</a></td></tr>
+<tr class="divSideboxEntry">
+<td width="15" align="center" valign="middle" class="textSidebox"><img src="/phpgwapi/templates/default/images/orange-ball.png" width="9" height="9" alt="ball"></td><td class="textSidebox"><a class="textSidebox" href="/index.php?menuaction=calendar.uicalendar.planner">Planejamento do grupo</a></td></tr>
+<tr class="divSideboxEntry"> 
+	<td colspan="2" height="8" class="textSidebox">&nbsp;</td>
+</tr>
+<tr class="divSideboxEntry">
+<td width="15" align="center" valign="middle" class="textSidebox"><img src="/phpgwapi/templates/default/images/orange-ball.png" width="9" height="9" alt="ball"></td><td class="textSidebox"><a class="textSidebox" href="/index.php?menuaction=calendar.uiicalendar.import">Importar</a></td></tr>
+<tr class="divSideboxEntry">
+<td width="15" align="center" valign="middle" class="textSidebox"><img src="/phpgwapi/templates/default/images/orange-ball.png" width="9" height="9" alt="ball"></td><td class="textSidebox"><a class="textSidebox" href="/calendar/inc/hourReport.php">Relatório de horas</a></td></tr>
+<tr class="divSideboxEntry">
+<td width="15" align="center" valign="middle" class="textSidebox"><img src="/phpgwapi/templates/default/images/orange-ball.png" width="9" height="9" alt="ball"></td><td class="textSidebox"><a class="textSidebox" href="javascript:openwindow('calendar/templates/default/publicView.php')">Agendas públicas</a></td></tr>
+	</tbody></table>	
+		</div>
+		</div>
+		<div class="sideboxSpace"></div>
+<div class="divSidebox">
+	<div class="divSideboxHeader"><span>Preferências</span></div>
+	<div>
+		<table width="100%" cellspacing="0" cellpadding="0" border="0">
+<tbody><tr class="divSideboxEntry">
+<td width="15" align="center" valign="middle" class="textSidebox"><img src="/phpgwapi/templates/default/images/orange-ball.png" width="9" height="9" alt="ball"></td><td class="textSidebox"><a class="textSidebox" href="/preferences/preferences.php?appname=calendar">Configurações do calendário</a></td></tr>
+<tr class="divSideboxEntry">
+<td width="15" align="center" valign="middle" class="textSidebox"><img src="/phpgwapi/templates/default/images/orange-ball.png" width="9" height="9" alt="ball"></td><td class="textSidebox"><a class="textSidebox" href="/index.php?menuaction=preferences.uiaclprefs.index&amp;acl_app=calendar">Permitir acesso</a></td></tr>
+<tr class="divSideboxEntry">
+<td width="15" align="center" valign="middle" class="textSidebox"><img src="/phpgwapi/templates/default/images/orange-ball.png" width="9" height="9" alt="ball"></td><td class="textSidebox"><a class="textSidebox" href="/index.php?menuaction=preferences.uicategories.index&amp;cats_app=calendar&amp;cats_level=True&amp;global_cats=True">Editar categorias</a></td></tr>
+	</tbody></table>	
+		</div>
+		</div>
+		<div class="sideboxSpace"></div>
+</div>
+</td><td style="padding-top:10px" valign="top">
+<a href="#" onclick="ypSlideOutMenu.hide('menu2')"><img src="/phpgwapi/templates/default/images/dragarea_left.png" align="right"></a>
+</td></tr></tbody></table>
+</div>
+</div>
+<script language="Javascript">
+	initBar(GetCookie("showHeader"));
+</script>	
+	<div id="divSubContainer">
+		<table width="100%" cellspacing="0" cellpadding="0" border="0">
+		<tbody><tr>
+			
+		
+		<!-- End Sidebox Column -->
+		<!-- Applicationbox Column -->
+		<td id="tdAppbox" valign="top" style="padding-left:0px;">
+		<div id="divAppboxHeader">Agenda de Eventos</div>
+		<div id="divAppbox" class="divAppbox">
+		<table id="tableDivAppbox" width="98%" cellpadding="0" cellspacing="0">
+		<tbody><tr><td>
+<script language="Javascript">
+function openwindow(url)
+{ 
+	
+	var window_features = 	"scrollbars=yes,resizable=yes,location=no,menubar=no," + 
+							"personalbar=no,status=no,titlebar=no,toolbar=no," + 
+							"screenX=screen.width/3,screenY=screen.height/3,top=screen.height/3,left=screen.width/3,width=" + 
+							screen.width/4*3 + ",height=" + screen.height/8*3; 
+	
+	self.open(url,'', window_features); 
+}
+</script>
+
+<table id="calendar_head_table" class="calendar_head_table" border="0" width="100%" cols="8" cellpadding="0" cellspacing="0">
+	<tbody><tr>
+		
+  <td width="2%">&nbsp;</td>
+  <td width="2%"><a href="/index.php?menuaction=calendar.uicalendar.day&amp;date=20250409"><img src="/calendar/templates/default/images/today.png" alt="Hoje" title="Hoje" border="0"></a></td>
+  <td width="2%" align="left"><a href="/index.php?menuaction=calendar.uicalendar.week&amp;date=20250409"><img src="/calendar/templates/default/images/week.png" alt="Esta Semana" title="Esta Semana" border="0"></a></td>
+  <td width="2%" align="left"><a href="/index.php?menuaction=calendar.uicalendar.month&amp;date=20250409"><img src="/calendar/templates/default/images/month.png" alt="Este mês" title="Este mês" border="0"></a></td>
+  <td width="2%" align="left"><a href="/index.php?menuaction=calendar.uicalendar.year&amp;date=20250409"><img src="/calendar/templates/default/images/year.png" alt="Este ano" title="Este ano" border="0"></a></td>
+  <td width="2%" align="left"><a href="/index.php?menuaction=calendar.uicalendar.planner&amp;date=20250409"><img src="/calendar/templates/default/images/planner.png" alt="Planejar" title="Planejar" border="0"></a></td>
+  <td width="86%" align="left">&nbsp;</td>
+	</tr>
+</tbody></table>
+<table id="calendar_head_table" class="calendar_head_table" border="0" width="100%" cols="9" cellpadding="0" cellspacing="0">
+	<tbody><tr>
+		
+<form action="/index.php?menuaction=calendar.uicalendar.week" method="post" name="cat_idform"></form>
+<td width="28%" align="center" valign="top" style="padding-top:16px">
+	<span style="font-size:10px"><b>Categoria:</b>
+    <input type="hidden" name="from" value="">
+    <input type="hidden" name="month" value="4">
+    <input type="hidden" name="day" value="9">
+    <input type="hidden" name="year" value="2025">
+
+    <select name="cat_id" onchange="document.cat_idform.submit()">
+		<option value="0">Todos</option><option value="1">global&nbsp;&lt;Global&nbsp;Agenda de Eventos&gt;</option>
+
+	</select>
+    <noscript>
+    	<input type="submit" value="Prossiga!">
+    </noscript>
+	</span>
+</td>
+
+
+<form action="/index.php?menuaction=calendar.uicalendar.week" method="post" name="filterform"></form>
+<td width="28%" align="center" valign="top" style="padding-top:16px">
+	<span style="font-size:10px"><b>Filtro:</b>
+    <input type="hidden" name="from" value="">
+    <input type="hidden" name="month" value="4">
+    <input type="hidden" name="day" value="9">
+    <input type="hidden" name="year" value="2025">
+
+    <select name="filter" onchange="document.filterform.submit()">
+		<option value=" all " selected="">Todos</option>
+     <option value=" private ">Restrito somente</option>
+
+	</select>
+    <noscript>
+    	<input type="submit" value="Prossiga!">
+    </noscript>
+	</span>
+</td>
+
+
+<form action="/index.php?menuaction=calendar.uicalendar.week" method="post" name="ownerform"></form>
+<td width="44%" align="center" valign="top" style="padding-top:16px">
+	<span style="font-size:10px"><b>Usuário:</b>
+    <input type="hidden" name="from" value="">
+    <input type="hidden" name="month" value="4">
+    <input type="hidden" name="day" value="9">
+    <input type="hidden" name="year" value="2025">
+
+    <select id="userExportCalendar" name="owner" onchange="document.ownerform.submit()">
+		    <option value="152394" selected="">Pablo Henrique Ferreira de Franca [pablo.henrique1]</option>
+
+	</select>
+    <noscript>
+    	<input type="submit" value="Prossiga!">
+    </noscript>
+	</span>
+</td>
+
+
+<td align="right" valign="bottom">
+<nobr>
+<form action="/index.php?menuaction=calendar.uicalendar.search" method="post" name="Procuraform">
+<div style="padding-top:15px; padding-right: 2px">
+	    <input type="hidden" name="from" value="">
+    <input type="hidden" name="month" value="4">
+    <input type="hidden" name="day" value="9">
+    <input type="hidden" name="year" value="2025">
+    <input type="hidden" name="filter" value=" all ">
+    <input type="hidden" name="sortby" value="category">
+    <input type="hidden" name="num_months" value="1">
+    <input name="keywords"> 
+	<input id="" style="font-size:10px" type="submit" value="Procura">
+</div>
+</form>
+</nobr>
+</td>
+	</tr>
+</tbody></table><br>
+<table class="calendar_index_table" id="calendar_index_table" width="100%" cols="5">
+	<tbody><tr>
+		<td align="left" width="33%">
+			<span class="calendar_user_identifier">
+					Pablo Henrique Ferreira de Franca [pablo.henrique1]
+			</span>
+		</td>
+		<td align="center" width="33%">
+			<span class="calendar_month_identifier">
+				Abril 2025
+			</span>
+		</td>
+		<td align="right" style="width: 33%; font-size: 14px;">
+			<span class="calendar_user_identifier">
+				<p>Agenda de Eventos</p>
+			</span>
+		</td>
+	</tr>
+</tbody></table>
+
+
+<table id="calendar_m_w_table" class="calendar_m_w_table" border="0" width="100%">
+	<!-- from month_header.tpl ---->
+	
+
+<tbody><tr class="calendar_m_w_table_header" colspan="" width="14%">
+
+<th bgcolor="#D3DCE3" width="14.28%">Seg</th>
+<th bgcolor="#D3DCE3" width="14.28%">Ter</th>
+<th bgcolor="#D3DCE3" width="14.28%">Qua</th>
+<th bgcolor="#D3DCE3" width="14.28%">Qui</th>
+<th bgcolor="#D3DCE3" width="14.28%">Sex</th>
+<th bgcolor="#D3DCE3" width="14.28%">Sab</th>
+<th bgcolor="#D3DCE3" width="14.28%">Dom</th></tr>
+
+<tr class="calendar_m_w_table_header" colspan="" width="14%">
+
+<td class="calendar_m_w_tablecell" colspan="1" width="14%"></td>
+<td class="calendar_m_w_tablecell" colspan="1" width="14%" bgcolor="#ffffff">
+<span class="screen_only">[ </span><span class="calendar_m_w_table_daynumber"><a href="/index.php?menuaction=calendar.uicalendar.day&amp;date=20250401">1</a></span><span class="screen_only"> ]</span> <a href="/index.php?menuaction=calendar.uicalendar.add&amp;date=20250401"><img src="/calendar/templates/default/images/new3.png" width="10" height="10" title="Nova Entrada" border="0" align="center"></a> &nbsp; <a href="/index.php?menuaction=calendar.uicalendar.week&amp;date=20250401"><span id="calendar_weekinfo" class="calendar_weekinfo">Semana 14</span></a><br>
+    
+
+
+<div id="calendar_event_entry" style="overflow:hidden;">
+
+
+<a class="event_entry" href="/index.php?menuaction=calendar.uicalendar.view&amp;cal_id=276110&amp;date=20250401" onmouseover="window.status='Visualizar esta entrada'; return true;" onmouseout="window.status=''; return true;" title="Encaminhamentos/ações do PEI (equipe USI) "><br>
+ <img src="/calendar/templates/default/images/recur.png" width="12" height="12" title="evento recorrente" border="0">
+ <img src="/calendar/templates/default/images/multi_3.png" width="14" height="14" title="Max Jose Lins Timoteo [max.timoteo] (A),
+Eduardo Jose Figueiroa da Silva [eduardo.silva] (A),
+Bruno Camelo [bruno.camelo] (S),
+Pablo Henrique Ferreira de Franca [pablo.henrique1] (S),
+Italo de almeida Dantas [italo.dantas] (A)" border="0">
+&nbsp;<font size="1"><span style="color: black">14:00-16:00</span>  (S)<br><b>Reunião PE-Integrado</b><br><i>Encaminhamentos/ações do PEI (equipe USI)</i> <br><b>Local:</b> 
+</font></a><font size="1">
+</font></div></td>
+<td class="calendar_m_w_tablecell" colspan="1" width="14%" bgcolor="#ffffff">
+<span class="screen_only">[ </span><span class="calendar_m_w_table_daynumber"><a href="/index.php?menuaction=calendar.uicalendar.day&amp;date=20250402">2</a></span><span class="screen_only"> ]</span> <a href="/index.php?menuaction=calendar.uicalendar.add&amp;date=20250402"><img src="/calendar/templates/default/images/new3.png" width="10" height="10" title="Nova Entrada" border="0" align="center"></a><br>
+    
+
+
+<div id="calendar_event_entry" style="overflow:hidden;">
+
+
+<a class="event_entry" href="/index.php?menuaction=calendar.uicalendar.view&amp;cal_id=277225&amp;date=20250402" onmouseover="window.status='Visualizar esta entrada'; return true;" onmouseout="window.status=''; return true;" title=" "><br>
+ <img src="/calendar/templates/default/images/circle.png" width="9" height="9" title="evento único" border="0">
+ <img src="/calendar/templates/default/images/multi_3.png" width="14" height="14" title="Lianne Borges Maciel [lianne.maciel] (A),
+Petronio Rufino Ferreira Bessa [petronio.bessa] (A),
+Yuri Tiago Vasconcellos Pereira [yuri.vasconcellos] (A),
+Daniel Antonio da Silva [danielantonio.silva] (S),
+Jose Junior Santos [jose.jsantos] (S),
+Pablo Henrique Ferreira de Franca [pablo.henrique1] (A),
+rodrigo santos do nascimento [rodrigo.santos25] (S),
+Italo de almeida Dantas [italo.dantas] (A),
+Lude Luigi Marcopolo Nogueira [luigi.nogueira] (A)" border="0">
+&nbsp;<font size="1"><span style="color: black">09:30-12:00</span>  (A)<br><b>Treinamento Looker</b><br><i></i> <br><b>Local:</b> 
+</font></a><font size="1">
+</font></div></td>
+<td class="calendar_m_w_tablecell" colspan="1" width="14%" bgcolor="#ffffff">
+<span class="screen_only">[ </span><span class="calendar_m_w_table_daynumber"><a href="/index.php?menuaction=calendar.uicalendar.day&amp;date=20250403">3</a></span><span class="screen_only"> ]</span> <a href="/index.php?menuaction=calendar.uicalendar.add&amp;date=20250403"><img src="/calendar/templates/default/images/new3.png" width="10" height="10" title="Nova Entrada" border="0" align="center"></a><br>
+    
+</td>
+<td class="calendar_m_w_tablecell" colspan="1" width="14%" bgcolor="#ffffff">
+<span class="screen_only">[ </span><span class="calendar_m_w_table_daynumber"><a href="/index.php?menuaction=calendar.uicalendar.day&amp;date=20250404">4</a></span><span class="screen_only"> ]</span> <a href="/index.php?menuaction=calendar.uicalendar.add&amp;date=20250404"><img src="/calendar/templates/default/images/new3.png" width="10" height="10" title="Nova Entrada" border="0" align="center"></a><br>
+    
+</td>
+<td class="calendar_m_w_tablecell" colspan="1" width="14%" bgcolor="#ffffff">
+<span class="screen_only">[ </span><span class="calendar_m_w_table_daynumber"><a href="/index.php?menuaction=calendar.uicalendar.day&amp;date=20250405">5</a></span><span class="screen_only"> ]</span> <a href="/index.php?menuaction=calendar.uicalendar.add&amp;date=20250405"><img src="/calendar/templates/default/images/new3.png" width="10" height="10" title="Nova Entrada" border="0" align="center"></a><br>
+    
+</td>
+<td class="calendar_m_w_tablecell" colspan="1" width="14%" bgcolor="#ffffff">
+<span class="screen_only">[ </span><span class="calendar_m_w_table_daynumber"><a href="/index.php?menuaction=calendar.uicalendar.day&amp;date=20250406">6</a></span><span class="screen_only"> ]</span> <a href="/index.php?menuaction=calendar.uicalendar.add&amp;date=20250406"><img src="/calendar/templates/default/images/new3.png" width="10" height="10" title="Nova Entrada" border="0" align="center"></a><br>
+    
+</td></tr>
+
+<tr class="calendar_m_w_table_header" colspan="" width="14%">
+
+<td class="calendar_m_w_tablecell" colspan="1" width="14%" bgcolor="#f4f8fb">
+<span class="screen_only">[ </span><span class="calendar_m_w_table_daynumber"><a href="/index.php?menuaction=calendar.uicalendar.day&amp;date=20250407">7</a></span><span class="screen_only"> ]</span> <a href="/index.php?menuaction=calendar.uicalendar.add&amp;date=20250407"><img src="/calendar/templates/default/images/new3.png" width="10" height="10" title="Nova Entrada" border="0" align="center"></a> &nbsp; <a href="/index.php?menuaction=calendar.uicalendar.week&amp;date=20250407"><span id="calendar_weekinfo" class="calendar_weekinfo">Semana 15</span></a><br>
+    
+</td>
+<td class="calendar_m_w_tablecell" colspan="1" width="14%" bgcolor="#f4f8fb">
+<span class="screen_only">[ </span><span class="calendar_m_w_table_daynumber"><a href="/index.php?menuaction=calendar.uicalendar.day&amp;date=20250408">8</a></span><span class="screen_only"> ]</span> <a href="/index.php?menuaction=calendar.uicalendar.add&amp;date=20250408"><img src="/calendar/templates/default/images/new3.png" width="10" height="10" title="Nova Entrada" border="0" align="center"></a><br>
+    
+
+
+<div id="calendar_event_entry" style="overflow:hidden;">
+
+
+<a class="event_entry" href="/index.php?menuaction=calendar.uicalendar.view&amp;cal_id=276110&amp;date=20250408" onmouseover="window.status='Visualizar esta entrada'; return true;" onmouseout="window.status=''; return true;" title="Encaminhamentos/ações do PEI (equipe USI) "><br>
+ <img src="/calendar/templates/default/images/recur.png" width="12" height="12" title="evento recorrente" border="0">
+ <img src="/calendar/templates/default/images/multi_3.png" width="14" height="14" title="Max Jose Lins Timoteo [max.timoteo] (A),
+Eduardo Jose Figueiroa da Silva [eduardo.silva] (A),
+Bruno Camelo [bruno.camelo] (S),
+Pablo Henrique Ferreira de Franca [pablo.henrique1] (S),
+Italo de almeida Dantas [italo.dantas] (A)" border="0">
+&nbsp;<font size="1"><span style="color: black">14:00-16:00</span>  (S)<br><b>Reunião PE-Integrado</b><br><i>Encaminhamentos/ações do PEI (equipe USI)</i> <br><b>Local:</b> 
+</font></a><font size="1">
+</font></div></td>
+<td class="calendar_m_w_tablecell" colspan="1" width="14%" bgcolor="#FFFFCC">
+<span class="screen_only">[ </span><span class="calendar_m_w_table_daynumber"><a href="/index.php?menuaction=calendar.uicalendar.day&amp;date=20250409">9</a></span><span class="screen_only"> ]</span> <a href="/index.php?menuaction=calendar.uicalendar.add&amp;date=20250409"><img src="/calendar/templates/default/images/new3.png" width="10" height="10" title="Nova Entrada" border="0" align="center"></a><br>
+    
+</td>
+<td class="calendar_m_w_tablecell" colspan="1" width="14%" bgcolor="#f4f8fb">
+<span class="screen_only">[ </span><span class="calendar_m_w_table_daynumber"><a href="/index.php?menuaction=calendar.uicalendar.day&amp;date=20250410">10</a></span><span class="screen_only"> ]</span> <a href="/index.php?menuaction=calendar.uicalendar.add&amp;date=20250410"><img src="/calendar/templates/default/images/new3.png" width="10" height="10" title="Nova Entrada" border="0" align="center"></a><br>
+    
+</td>
+<td class="calendar_m_w_tablecell" colspan="1" width="14%" bgcolor="#f4f8fb">
+<span class="screen_only">[ </span><span class="calendar_m_w_table_daynumber"><a href="/index.php?menuaction=calendar.uicalendar.day&amp;date=20250411">11</a></span><span class="screen_only"> ]</span> <a href="/index.php?menuaction=calendar.uicalendar.add&amp;date=20250411"><img src="/calendar/templates/default/images/new3.png" width="10" height="10" title="Nova Entrada" border="0" align="center"></a><br>
+    
+</td>
+<td class="calendar_m_w_tablecell" colspan="1" width="14%" bgcolor="#f4f8fb">
+<span class="screen_only">[ </span><span class="calendar_m_w_table_daynumber"><a href="/index.php?menuaction=calendar.uicalendar.day&amp;date=20250412">12</a></span><span class="screen_only"> ]</span> <a href="/index.php?menuaction=calendar.uicalendar.add&amp;date=20250412"><img src="/calendar/templates/default/images/new3.png" width="10" height="10" title="Nova Entrada" border="0" align="center"></a><br>
+    
+</td>
+<td class="calendar_m_w_tablecell" colspan="1" width="14%" bgcolor="#f4f8fb">
+<span class="screen_only">[ </span><span class="calendar_m_w_table_daynumber"><a href="/index.php?menuaction=calendar.uicalendar.day&amp;date=20250413">13</a></span><span class="screen_only"> ]</span> <a href="/index.php?menuaction=calendar.uicalendar.add&amp;date=20250413"><img src="/calendar/templates/default/images/new3.png" width="10" height="10" title="Nova Entrada" border="0" align="center"></a><br>
+    
+</td></tr>
+
+<tr class="calendar_m_w_table_header" colspan="" width="14%">
+
+<td class="calendar_m_w_tablecell" colspan="1" width="14%" bgcolor="#ffffff">
+<span class="screen_only">[ </span><span class="calendar_m_w_table_daynumber"><a href="/index.php?menuaction=calendar.uicalendar.day&amp;date=20250414">14</a></span><span class="screen_only"> ]</span> <a href="/index.php?menuaction=calendar.uicalendar.add&amp;date=20250414"><img src="/calendar/templates/default/images/new3.png" width="10" height="10" title="Nova Entrada" border="0" align="center"></a> &nbsp; <a href="/index.php?menuaction=calendar.uicalendar.week&amp;date=20250414"><span id="calendar_weekinfo" class="calendar_weekinfo">Semana 16</span></a><br>
+    
+</td>
+<td class="calendar_m_w_tablecell" colspan="1" width="14%" bgcolor="#ffffff">
+<span class="screen_only">[ </span><span class="calendar_m_w_table_daynumber"><a href="/index.php?menuaction=calendar.uicalendar.day&amp;date=20250415">15</a></span><span class="screen_only"> ]</span> <a href="/index.php?menuaction=calendar.uicalendar.add&amp;date=20250415"><img src="/calendar/templates/default/images/new3.png" width="10" height="10" title="Nova Entrada" border="0" align="center"></a><br>
+    
+
+
+<div id="calendar_event_entry" style="overflow:hidden;">
+
+
+<a class="event_entry" href="/index.php?menuaction=calendar.uicalendar.view&amp;cal_id=276110&amp;date=20250415" onmouseover="window.status='Visualizar esta entrada'; return true;" onmouseout="window.status=''; return true;" title="Encaminhamentos/ações do PEI (equipe USI) "><br>
+ <img src="/calendar/templates/default/images/recur.png" width="12" height="12" title="evento recorrente" border="0">
+ <img src="/calendar/templates/default/images/multi_3.png" width="14" height="14" title="Max Jose Lins Timoteo [max.timoteo] (A),
+Eduardo Jose Figueiroa da Silva [eduardo.silva] (A),
+Bruno Camelo [bruno.camelo] (S),
+Pablo Henrique Ferreira de Franca [pablo.henrique1] (S),
+Italo de almeida Dantas [italo.dantas] (A)" border="0">
+&nbsp;<font size="1"><span style="color: black">14:00-16:00</span>  (S)<br><b>Reunião PE-Integrado</b><br><i>Encaminhamentos/ações do PEI (equipe USI)</i> <br><b>Local:</b> 
+</font></a><font size="1">
+</font></div></td>
+<td class="calendar_m_w_tablecell" colspan="1" width="14%" bgcolor="#ffffff">
+<span class="screen_only">[ </span><span class="calendar_m_w_table_daynumber"><a href="/index.php?menuaction=calendar.uicalendar.day&amp;date=20250416">16</a></span><span class="screen_only"> ]</span> <a href="/index.php?menuaction=calendar.uicalendar.add&amp;date=20250416"><img src="/calendar/templates/default/images/new3.png" width="10" height="10" title="Nova Entrada" border="0" align="center"></a><br>
+    
+</td>
+<td class="calendar_m_w_tablecell" colspan="1" width="14%" bgcolor="#ffffff">
+<span class="screen_only">[ </span><span class="calendar_m_w_table_daynumber"><a href="/index.php?menuaction=calendar.uicalendar.day&amp;date=20250417">17</a></span><span class="screen_only"> ]</span> <a href="/index.php?menuaction=calendar.uicalendar.add&amp;date=20250417"><img src="/calendar/templates/default/images/new3.png" width="10" height="10" title="Nova Entrada" border="0" align="center"></a><br>
+    
+</td>
+<td class="calendar_m_w_tablecell" colspan="1" width="14%" bgcolor="#daaaaa">
+<span class="screen_only">[ </span><span class="calendar_m_w_table_daynumber"><a href="/index.php?menuaction=calendar.uicalendar.day&amp;date=20250418">18</a></span><span class="screen_only"> ]</span> <a href="/index.php?menuaction=calendar.uicalendar.add&amp;date=20250418"><img src="/calendar/templates/default/images/new3.png" width="10" height="10" title="Nova Entrada" border="0" align="center"></a><br>
+    
+<font face="Arial, Helvetica, san-serif" size="-1">Sexta-feira Santa</font><br>
+</td>
+<td class="calendar_m_w_tablecell" colspan="1" width="14%" bgcolor="#ffffff">
+<span class="screen_only">[ </span><span class="calendar_m_w_table_daynumber"><a href="/index.php?menuaction=calendar.uicalendar.day&amp;date=20250419">19</a></span><span class="screen_only"> ]</span> <a href="/index.php?menuaction=calendar.uicalendar.add&amp;date=20250419"><img src="/calendar/templates/default/images/new3.png" width="10" height="10" title="Nova Entrada" border="0" align="center"></a><br>
+    
+</td>
+<td class="calendar_m_w_tablecell" colspan="1" width="14%" bgcolor="#daaaaa">
+<span class="screen_only">[ </span><span class="calendar_m_w_table_daynumber"><a href="/index.php?menuaction=calendar.uicalendar.day&amp;date=20250420">20</a></span><span class="screen_only"> ]</span> <a href="/index.php?menuaction=calendar.uicalendar.add&amp;date=20250420"><img src="/calendar/templates/default/images/new3.png" width="10" height="10" title="Nova Entrada" border="0" align="center"></a><br>
+    
+<font face="Arial, Helvetica, san-serif" size="-1">Pascoa</font><br>
+</td></tr>
+
+<tr class="calendar_m_w_table_header" colspan="" width="14%">
+
+<td class="calendar_m_w_tablecell" colspan="1" width="14%" bgcolor="#daaaaa">
+<span class="screen_only">[ </span><span class="calendar_m_w_table_daynumber"><a href="/index.php?menuaction=calendar.uicalendar.day&amp;date=20250421">21</a></span><span class="screen_only"> ]</span> <a href="/index.php?menuaction=calendar.uicalendar.add&amp;date=20250421"><img src="/calendar/templates/default/images/new3.png" width="10" height="10" title="Nova Entrada" border="0" align="center"></a> &nbsp; <a href="/index.php?menuaction=calendar.uicalendar.week&amp;date=20250421"><span id="calendar_weekinfo" class="calendar_weekinfo">Semana 17</span></a><br>
+    
+<font face="Arial, Helvetica, san-serif" size="-1">Tiradentes</font><br>
+</td>
+<td class="calendar_m_w_tablecell" colspan="1" width="14%" bgcolor="#f4f8fb">
+<span class="screen_only">[ </span><span class="calendar_m_w_table_daynumber"><a href="/index.php?menuaction=calendar.uicalendar.day&amp;date=20250422">22</a></span><span class="screen_only"> ]</span> <a href="/index.php?menuaction=calendar.uicalendar.add&amp;date=20250422"><img src="/calendar/templates/default/images/new3.png" width="10" height="10" title="Nova Entrada" border="0" align="center"></a><br>
+    
+
+
+<div id="calendar_event_entry" style="overflow:hidden;">
+
+
+<a class="event_entry" href="/index.php?menuaction=calendar.uicalendar.view&amp;cal_id=276110&amp;date=20250422" onmouseover="window.status='Visualizar esta entrada'; return true;" onmouseout="window.status=''; return true;" title="Encaminhamentos/ações do PEI (equipe USI) "><br>
+ <img src="/calendar/templates/default/images/recur.png" width="12" height="12" title="evento recorrente" border="0">
+ <img src="/calendar/templates/default/images/multi_3.png" width="14" height="14" title="Max Jose Lins Timoteo [max.timoteo] (A),
+Eduardo Jose Figueiroa da Silva [eduardo.silva] (A),
+Bruno Camelo [bruno.camelo] (S),
+Pablo Henrique Ferreira de Franca [pablo.henrique1] (S),
+Italo de almeida Dantas [italo.dantas] (A)" border="0">
+&nbsp;<font size="1"><span style="color: black">14:00-16:00</span>  (S)<br><b>Reunião PE-Integrado</b><br><i>Encaminhamentos/ações do PEI (equipe USI)</i> <br><b>Local:</b> 
+</font></a><font size="1">
+</font></div></td>
+<td class="calendar_m_w_tablecell" colspan="1" width="14%" bgcolor="#f4f8fb">
+<span class="screen_only">[ </span><span class="calendar_m_w_table_daynumber"><a href="/index.php?menuaction=calendar.uicalendar.day&amp;date=20250423">23</a></span><span class="screen_only"> ]</span> <a href="/index.php?menuaction=calendar.uicalendar.add&amp;date=20250423"><img src="/calendar/templates/default/images/new3.png" width="10" height="10" title="Nova Entrada" border="0" align="center"></a><br>
+    
+</td>
+<td class="calendar_m_w_tablecell" colspan="1" width="14%" bgcolor="#f4f8fb">
+<span class="screen_only">[ </span><span class="calendar_m_w_table_daynumber"><a href="/index.php?menuaction=calendar.uicalendar.day&amp;date=20250424">24</a></span><span class="screen_only"> ]</span> <a href="/index.php?menuaction=calendar.uicalendar.add&amp;date=20250424"><img src="/calendar/templates/default/images/new3.png" width="10" height="10" title="Nova Entrada" border="0" align="center"></a><br>
+    
+</td>
+<td class="calendar_m_w_tablecell" colspan="1" width="14%" bgcolor="#f4f8fb">
+<span class="screen_only">[ </span><span class="calendar_m_w_table_daynumber"><a href="/index.php?menuaction=calendar.uicalendar.day&amp;date=20250425">25</a></span><span class="screen_only"> ]</span> <a href="/index.php?menuaction=calendar.uicalendar.add&amp;date=20250425"><img src="/calendar/templates/default/images/new3.png" width="10" height="10" title="Nova Entrada" border="0" align="center"></a><br>
+    
+</td>
+<td class="calendar_m_w_tablecell" colspan="1" width="14%" bgcolor="#f4f8fb">
+<span class="screen_only">[ </span><span class="calendar_m_w_table_daynumber"><a href="/index.php?menuaction=calendar.uicalendar.day&amp;date=20250426">26</a></span><span class="screen_only"> ]</span> <a href="/index.php?menuaction=calendar.uicalendar.add&amp;date=20250426"><img src="/calendar/templates/default/images/new3.png" width="10" height="10" title="Nova Entrada" border="0" align="center"></a><br>
+    
+</td>
+<td class="calendar_m_w_tablecell" colspan="1" width="14%" bgcolor="#f4f8fb">
+<span class="screen_only">[ </span><span class="calendar_m_w_table_daynumber"><a href="/index.php?menuaction=calendar.uicalendar.day&amp;date=20250427">27</a></span><span class="screen_only"> ]</span> <a href="/index.php?menuaction=calendar.uicalendar.add&amp;date=20250427"><img src="/calendar/templates/default/images/new3.png" width="10" height="10" title="Nova Entrada" border="0" align="center"></a><br>
+    
+</td></tr>
+
+<tr class="calendar_m_w_table_header" colspan="" width="14%">
+
+<td class="calendar_m_w_tablecell" colspan="1" width="14%" bgcolor="#ffffff">
+<span class="screen_only">[ </span><span class="calendar_m_w_table_daynumber"><a href="/index.php?menuaction=calendar.uicalendar.day&amp;date=20250428">28</a></span><span class="screen_only"> ]</span> <a href="/index.php?menuaction=calendar.uicalendar.add&amp;date=20250428"><img src="/calendar/templates/default/images/new3.png" width="10" height="10" title="Nova Entrada" border="0" align="center"></a> &nbsp; <a href="/index.php?menuaction=calendar.uicalendar.week&amp;date=20250428"><span id="calendar_weekinfo" class="calendar_weekinfo">Semana 18</span></a><br>
+    
+</td>
+<td class="calendar_m_w_tablecell" colspan="1" width="14%" bgcolor="#ffffff">
+<span class="screen_only">[ </span><span class="calendar_m_w_table_daynumber"><a href="/index.php?menuaction=calendar.uicalendar.day&amp;date=20250429">29</a></span><span class="screen_only"> ]</span> <a href="/index.php?menuaction=calendar.uicalendar.add&amp;date=20250429"><img src="/calendar/templates/default/images/new3.png" width="10" height="10" title="Nova Entrada" border="0" align="center"></a><br>
+    
+
+
+<div id="calendar_event_entry" style="overflow:hidden;">
+
+
+<a class="event_entry" href="/index.php?menuaction=calendar.uicalendar.view&amp;cal_id=276110&amp;date=20250429" onmouseover="window.status='Visualizar esta entrada'; return true;" onmouseout="window.status=''; return true;" title="Encaminhamentos/ações do PEI (equipe USI) "><br>
+ <img src="/calendar/templates/default/images/recur.png" width="12" height="12" title="evento recorrente" border="0">
+ <img src="/calendar/templates/default/images/multi_3.png" width="14" height="14" title="Max Jose Lins Timoteo [max.timoteo] (A),
+Eduardo Jose Figueiroa da Silva [eduardo.silva] (A),
+Bruno Camelo [bruno.camelo] (S),
+Pablo Henrique Ferreira de Franca [pablo.henrique1] (S),
+Italo de almeida Dantas [italo.dantas] (A)" border="0">
+&nbsp;<font size="1"><span style="color: black">14:00-16:00</span>  (S)<br><b>Reunião PE-Integrado</b><br><i>Encaminhamentos/ações do PEI (equipe USI)</i> <br><b>Local:</b> 
+</font></a><font size="1">
+</font></div></td>
+<td class="calendar_m_w_tablecell" colspan="1" width="14%" bgcolor="#ffffff">
+<span class="screen_only">[ </span><span class="calendar_m_w_table_daynumber"><a href="/index.php?menuaction=calendar.uicalendar.day&amp;date=20250430">30</a></span><span class="screen_only"> ]</span> <a href="/index.php?menuaction=calendar.uicalendar.add&amp;date=20250430"><img src="/calendar/templates/default/images/new3.png" width="10" height="10" title="Nova Entrada" border="0" align="center"></a><br>
+    
+</td>
+<td class="calendar_m_w_tablecell" colspan="1" width="14%"></td>
+<td class="calendar_m_w_tablecell" colspan="1" width="14%"></td>
+<td class="calendar_m_w_tablecell" colspan="1" width="14%"></td>
+<td class="calendar_m_w_tablecell" colspan="1" width="14%"></td></tr>
+</tbody></table>
+<p>
+</p><p>
+</p><div class="calendar_link_print">
+	
+</div>
+
+       <hr clear="all">
+       <font size="-1">
+       <table border="0" width="100%" cellpadding="0" cellspacing="0">
+        <tbody><tr>
+
+         <td valign="top" width="30%">
+          <font size="-1">
+           <form action="/index.php?menuaction=calendar.uicalendar.month" method="post" name="SelectMonth">
+            <b>Mês:</b>
+			
+            <select name="date" onchange="document.SelectMonth.submit()">
+	     <option value="20240501">Maio 2024</option>
+<option value="20240601">Junho 2024</option>
+<option value="20240701">Julho 2024</option>
+<option value="20240801">Agosto 2024</option>
+<option value="20240901">Setembro 2024</option>
+<option value="20241001">Outubro 2024</option>
+<option value="20241101">Novembro 2024</option>
+<option value="20241201">Dezembro 2024</option>
+<option value="20250101">Janeiro 2025</option>
+<option value="20250201">Fevereiro 2025</option>
+<option value="20250301">Março 2025</option>
+<option value="20250401" selected="">Abril 2025</option>
+<option value="20250501">Maio 2025</option>
+<option value="20250601">Junho 2025</option>
+<option value="20250701">Julho 2025</option>
+<option value="20250801">Agosto 2025</option>
+<option value="20250901">Setembro 2025</option>
+<option value="20251001">Outubro 2025</option>
+<option value="20251101">Novembro 2025</option>
+<option value="20251201">Dezembro 2025</option>
+
+	    </select>
+	    <input type="hidden" name="user" value="{user}">
+	    <input type="hidden" name="dia_ini" value="9">
+            <noscript><input type="submit" value="Prossiga!"></noscript>
+	   </form>
+	  </font>
+	 </td>
+         <td valign="top" width="30%">
+          <font size="-1">
+           <form action="/index.php?menuaction=calendar.uicalendar.month" method="post" name="SelectYear">
+            <b>Ano:</b>
+			
+            <select name="year" onchange="document.SelectYear.submit()">
+	     <option value="2022">2022</option>
+<option value="2023">2023</option>
+<option value="2024">2024</option>
+<option value="2025" selected="">2025</option>
+<option value="2026">2026</option>
+<option value="2027">2027</option>
+
+	    </select>
+	    <input type="hidden" name="user" value="{user}">
+	    <input type="hidden" name="dia_ini" value="9">
+            <noscript><input type="submit" value="Prossiga!"></noscript>
+	   </form>
+	  </font>
+	 </td>
+         <td>
+         
+<!-- BEGIN form_button -->
+<nobr>
+<form action="/index.php?menuaction=calendar.uiicalendar.import" method="post" name="Importarform">
+<div style="padding-top:15px; padding-right: 2px">
+	 
+	<input id="{button_id}" style="font-size:10px" type="submit" value="Importar">
+</div>
+</form>
+</nobr>
+
+<!-- END form_button -->
+
+         </td>
+         <td>
+         
+<!-- BEGIN form_button -->
+<nobr>
+<script>
+	function getUserSelect()
+	{
+		var _select = document.getElementById('userExportCalendar');
+		var _input	= document.getElementById('exportUserId');
+		
+		for( var i = 0; i < _select.options.length; i++ )
+		{
+			if( _select.options[i].selected )
+			{
+				_input.value = _select.options[i].value;
+			} 
+		}
+	}
+</script>
+<form action="/index.php?menuaction=calendar.uicalendar.export_all" method="post" name="Exportar todosform">
+<div style="padding-top:15px; padding-right: 2px">
+	
+	<input id="exportUserId" type="hidden" name="exportUserId" value="">
+	<input id="{button_id}" style="font-size:10px" type="submit" value="Exportar todos" onclick="getUserSelect()" ;="">
+</div>
+	
+</form>
+</nobr>
+<!-- END form_button -->
+
+         </td>
+	</tr>
+	<tr style="display: ">
+		<td colspan="4"><hr clear="all"></td>
+	</tr>
+       	
+	<tr style="display: ">
+		<td>
+			<font size="-1">
+				<span>
+					<b>Imprimir a partir de:</b>
+					<select id="day" name="day" onchange="document.SelectDay.submit()">
+						<option value="1">1</option>
+<option value="2">2</option>
+<option value="3">3</option>
+<option value="4">4</option>
+<option value="5">5</option>
+<option value="6">6</option>
+<option value="7">7</option>
+<option value="8">8</option>
+<option value="9" selected="">9</option>
+<option value="10">10</option>
+<option value="11">11</option>
+<option value="12">12</option>
+<option value="13">13</option>
+<option value="14">14</option>
+<option value="15">15</option>
+<option value="16">16</option>
+<option value="17">17</option>
+<option value="18">18</option>
+<option value="19">19</option>
+<option value="20">20</option>
+<option value="21">21</option>
+<option value="22">22</option>
+<option value="23">23</option>
+<option value="24">24</option>
+<option value="25">25</option>
+<option value="26">26</option>
+<option value="27">27</option>
+<option value="28">28</option>
+<option value="29">29</option>
+<option value="30">30</option>
+
+					</select>
+				</span>
+	    		<br> <br>
+	    		<span style="display: ">
+					<label>
+						<b>Quantidade de dias:</b>
+					</label>
+					<select id="qtd_dias" name="qtd_dias" onchange="document.SelectDay.submit()">
+						<option value=""></option>
+<option value="1">1</option>
+<option value="2">2</option>
+<option value="3">3</option>
+<option value="4">4</option>
+<option value="5">5</option>
+<option value="6">6</option>
+<option value="7">7</option>
+<option value="8">8</option>
+<option value="9">9</option>
+<option value="10">10</option>
+<option value="11">11</option>
+<option value="12">12</option>
+<option value="13">13</option>
+<option value="14">14</option>
+<option value="15">15</option>
+<option value="16">16</option>
+<option value="17">17</option>
+<option value="18">18</option>
+<option value="19">19</option>
+<option value="20">20</option>
+<option value="21">21</option>
+<option value="22">22</option>
+<option value="23">23</option>
+<option value="24">24</option>
+<option value="25">25</option>
+<option value="26">26</option>
+<option value="27">27</option>
+<option value="28">28</option>
+<option value="29">29</option>
+<option value="30">30</option>
+<option value="31">31</option>
+<option value="32">32</option>
+<option value="33">33</option>
+<option value="34">34</option>
+<option value="35">35</option>
+<option value="36">36</option>
+<option value="37">37</option>
+<option value="38">38</option>
+<option value="39">39</option>
+<option value="40">40</option>
+<option value="41">41</option>
+<option value="42">42</option>
+<option value="43">43</option>
+<option value="44">44</option>
+<option value="45">45</option>
+
+					</select>
+					<br>
+					<span style="font-size: 9px;">
+						Vazio imprime do dia escolhido abaixo até o final do mês corrente.
+					</span>
+	   			</span>
+    		</font>
+			<input type="hidden" name="user" value="{user}">
+			<noscript><input type="submit" value="Prossiga!"></noscript>
+		</td>
+	</tr>
+	<tr style="display: ">
+		<td colspan="4" align="center">Imprimir em: <a href="javascript:void(0)" onclick="javascript:window.open('index.php?menuaction=calendar.uicalendar.month&amp;year=2025&amp;month=4&amp;friendly=1&amp;day_ini='+
+						document.getElementById('day').value+'&amp;num_dias='+
+						document.getElementById('qtd_dias').value+'&amp;classic_print=0','','width=600,height=600,toolbar=no,scrollbars=yes,resizable=no');" onmouseover="window.status = 'Linhas'">[Linhas]</a> | 
+						<a href="javascript:void(0)" onclick="javascript:window.open('index.php?menuaction=calendar.uicalendar.month&amp;year=2025&amp;month=4&amp;friendly=1&amp;day_ini='+
+						document.getElementById('day').value+'&amp;num_dias='+
+						document.getElementById('qtd_dias').value+'&amp;classic_print=1','','width=600,height=600,toolbar=no,scrollbars=yes,resizable=no');" onmouseover="window.status = 'Colunas'">[Colunas]</a>
+						
+						</td>
+	</tr>
+        
+
+       </tbody></table>		 							</font></td></tr></tbody></table>
+									</div>
+		  <!-- Applicationbox Column -->
+		  </td>
+		  </tr>
+  </tbody></table>
+</div>
+<!-- END footer.tpl -->
+</body></html>
