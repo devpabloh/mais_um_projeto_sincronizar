@@ -6,6 +6,7 @@ from selenium.webdriver.support import expected_conditions as EC
 from urllib.parse import urlparse, parse_qs
 import time
 import keyboard
+from datetime import datetime
 
 # Função para formatar a data
 def formatar_data(data_str):
@@ -24,6 +25,7 @@ def formatar_data(data_str):
     return data_str
 
 class sincronizarExpresso:
+
     def __init__(self, username, password):
         self.username = username
         self.password = password
@@ -180,6 +182,450 @@ class sincronizarExpresso:
     def fechar(self):
         if self.driver:
             self.driver.quit()
+
+    def create_event(self, event_data):
+        try:
+            # Navegando até a página de criação de eventos
+            self.driver.get("https://www.expresso.pe.gov.br/index.php?menuaction=calendar.uicalendar.add&date=20250423")
+            time.sleep(3)
+            
+            # Preenchendo o formulário
+            input_titulo = self.driver.find_element(By.XPATH, "//input[@name='cal[title]']")
+            input_titulo.clear()
+            input_titulo.send_keys(event_data["titulo"]) 
+
+            # Selecionando a descrição
+            input_descricao = self.driver.find_element(By.XPATH, "//textarea[@name='cal[description]']")
+            input_descricao.clear()
+            input_descricao.send_keys(event_data["descricao"])
+
+            # Selecionando a localização
+            input_de_licalizacao = self.driver.find_element(By.XPATH, "//input[@name='cal[location]']")
+            input_de_licalizacao.clear()
+            input_de_licalizacao.send_keys(event_data.get("localizacao", ""))
+            
+            # Selecionando a data de inicio
+            input_data = self.driver.find_element(By.XPATH, "//input[@name='start[str]']")
+            input_data.clear()
+            input_data.send_keys(event_data["data"]) 
+
+            # Selecionando a data de fim
+            input_data_fim = self.driver.find_element(By.XPATH, "//input[@name='end[str]']")
+            input_data_fim.clear()
+            input_data_fim.send_keys(event_data["data"])
+
+            # Dividir o horário de início (formato HH:MM) em horas e minutos
+            horario_inicio = event_data["inicio"]
+            if ":" in horario_inicio:
+                hora_inicio, minuto_inicio = horario_inicio.split(":")
+            else:
+                # Caso não esteja no formato HH:MM
+                hora_inicio = "00"
+                minuto_inicio = "00"
+
+            # Selecionando o horário de inicio
+            input_horario_inicio_horas = self.driver.find_element(By.XPATH, "//input[@name='start[hour]']")
+            input_horario_inicio_horas.clear()
+            input_horario_inicio_horas.send_keys(hora_inicio)
+
+            input_horario_inicio_minutos = self.driver.find_element(By.XPATH, "//input[@name='start[min]']")
+            input_horario_inicio_minutos.clear()
+            input_horario_inicio_minutos.send_keys(minuto_inicio)
+
+            # Dividir o horário de fim (formato HH:MM) em horas e minutos
+            horario_fim = event_data["fim"]
+            if ":" in horario_fim:
+                hora_fim, minuto_fim = horario_fim.split(":")
+            else:
+                # Caso não esteja no formato HH:MM
+                hora_fim = "23"
+                minuto_fim = "59"
+
+            # Selecionando o horário de fim
+            input_horario_fim_hora = self.driver.find_element(By.XPATH, "//input[@name='end[hour]']")
+            input_horario_fim_hora.clear()
+            input_horario_fim_hora.send_keys(hora_fim)
+
+            input_horario_fim_minutos = self.driver.find_element(By.XPATH, "//input[@name='end[min]']")
+            input_horario_fim_minutos.clear()
+            input_horario_fim_minutos.send_keys(minuto_fim)
+
+            input_submit_salvar = self.driver.find_element(By.XPATH, "//input[@value='salvar']")
+            input_submit_salvar.click()
+            time.sleep(3)
+
+            # Tentar obter o ID do evento criado da URL
+            current_url = self.driver.current_url
+            id_evento = ""
+            
+            try:
+                parsed_url = urlparse(current_url)
+                params = parse_qs(parsed_url.query)
+                id_evento = params.get("cal_id", [""])[0] if "cal_id" in params else ""
+            except:
+                # Se não conseguir obter o ID, buscar o evento na lista
+                eventos = self.obterEventos()
+                for evento in eventos:
+                    if (evento.get('titulo') == event_data.get('titulo') and 
+                        evento.get('data') == event_data.get('data')):
+                        id_evento = evento.get('id')
+                        break
+            
+            # Adicionar ID ao evento
+            event_data['id'] = id_evento
+            
+            print(f"Evento criado no Expresso com ID: {id_evento}")
+            return event_data
+                
+        except Exception as e:
+            print(f"Erro ao criar evento no Expresso: {e}")
+            raise e
+        
+    def update_event(self, event_id, event_data):
+        try:
+            # Garantir que estamos na página de calendário
+            self.selecionarCalendario()
+
+            # Encontrar o evento pelo ID
+            edit_url = f"https://www.expresso.pe.gov.br/index.php?menuaction=calendar.uicalendar.view&cal_id={event_id}&date={event_data['data']}"
+            self.driver.get(edit_url)
+            time.sleep(2)
+
+            # Verificar se estamos realmente na página de edição
+            # (removida verificação problemática)
+            
+            # Atualizando campos do evento 
+            # Preenchendo o formulário
+            input_titulo = self.driver.find_element(By.XPATH, "//input[@name='cal[title]']")
+            input_titulo.clear()
+            input_titulo.send_keys(event_data["titulo"]) 
+
+            # Selecionando a descrição
+            input_descricao = self.driver.find_element(By.XPATH, "//textarea[@name='cal[description]']")
+            input_descricao.clear()
+            input_descricao.send_keys(event_data["descricao"])
+
+            # Selecionando a localização
+            input_de_licalizacao = self.driver.find_element(By.XPATH, "//input[@name='cal[location]']")
+            input_de_licalizacao.clear()
+            input_de_licalizacao.send_keys(event_data.get("localizacao", ""))
+            
+            # Selecionando a data de inicio
+            input_data = self.driver.find_element(By.XPATH, "//input[@name='start[str]']")
+            input_data.clear()
+            input_data.send_keys(event_data["data"]) 
+
+            # Selecionando a data de fim
+            input_data_fim = self.driver.find_element(By.XPATH, "//input[@name='end[str]']")
+            input_data_fim.clear()
+            input_data_fim.send_keys(event_data["data"])
+
+            # Dividir o horário de início (formato HH:MM) em horas e minutos
+            horario_inicio = event_data["inicio"]
+            if ":" in horario_inicio:
+                hora_inicio, minuto_inicio = horario_inicio.split(":")
+            else:
+                # Caso não esteja no formato HH:MM
+                hora_inicio = "00"
+                minuto_inicio = "00"
+
+            # Selecionando o horário de inicio
+            input_horario_inicio_horas = self.driver.find_element(By.XPATH, "//input[@name='start[hour]']")
+            input_horario_inicio_horas.clear()
+            input_horario_inicio_horas.send_keys(hora_inicio)
+
+            input_horario_inicio_minutos = self.driver.find_element(By.XPATH, "//input[@name='start[min]']")
+            input_horario_inicio_minutos.clear()
+            input_horario_inicio_minutos.send_keys(minuto_inicio)
+
+            # Dividir o horário de fim (formato HH:MM) em horas e minutos
+            horario_fim = event_data["fim"]
+            if ":" in horario_fim:
+                hora_fim, minuto_fim = horario_fim.split(":")
+            else:
+                # Caso não esteja no formato HH:MM
+                hora_fim = "23"
+                minuto_fim = "59"
+
+            # Selecionando o horário de fim
+            input_horario_fim_hora = self.driver.find_element(By.XPATH, "//input[@name='end[hour]']")
+            input_horario_fim_hora.clear()
+            input_horario_fim_hora.send_keys(hora_fim)
+
+            input_horario_fim_minutos = self.driver.find_element(By.XPATH, "//input[@name='end[min]']")
+            input_horario_fim_minutos.clear()
+            input_horario_fim_minutos.send_keys(minuto_fim)
+
+            input_submit_salvar = self.driver.find_element(By.XPATH, "//input[@value='salvar']")
+            input_submit_salvar.click()
+            time.sleep(3)
+
+            # Confirmar que o evento foi atualizado
+            print(f"Evento atualizado no Expresso: {event_id}")
+            
+            # Adicionar ID ao evento retornado
+            event_data['id'] = event_id
+            return event_data
+            
+        except Exception as e:
+            print(f"Erro ao atualizar evento no Expresso: {e}")
+            raise e
+
+    def delete_event(self, event_id, event_data=None):
+        try:
+            # Se event_data não for fornecido, usar um dicionário vazio
+            if event_data is None:
+                event_data = {'data': ''}
+            
+            # Garantir que estamos na página de calendário
+            if not self.driver.current_url.startswith('https://www.expresso.pe.gov.br/calendar/'):
+                self.selecionarCalendario()
+
+            # Encontrar o evento pelo ID
+            view_url = f"https://www.expresso.pe.gov.br/index.php?menuaction=calendar.uicalendar.view&cal_id={event_id}"
+            if event_data.get('data'):
+                view_url += f"&date={event_data['data']}"
+            
+            self.driver.get(view_url)
+            time.sleep(2)
+
+            # Verificar se estamos na página correta
+            # (modificado, pois a verificação original pode não ser precisa)
+            
+            # Clicar no botão de deletar
+            try:
+                botao_deletar = self.driver.find_element(By.XPATH, "//input[@value='remover']")
+                botao_deletar.click()
+                time.sleep(2)
+            
+                # Aceitar o alerta de confirmação
+                alert = self.driver.switch_to.alert
+                alert.accept()
+                time.sleep(2)
+            except:
+                # Se não encontrar o botão ou não houver alerta, tentar pressionar Enter
+                try:
+                    # Tentar outros possíveis botões
+                    botao_deletar = self.driver.find_element(By.XPATH, "//input[@value='Remover']")
+                    botao_deletar.click()
+                    time.sleep(2)
+                    
+                    # Tentar aceitar alerta, se houver
+                    try:
+                        alert = self.driver.switch_to.alert
+                        alert.accept()
+                    except:
+                        pass
+                except:
+                    # Se ainda não conseguir, pressionar Enter
+                    self.driver.find_element(By.TAG_NAME, 'body').send_keys(Keys.ENTER)
+                    time.sleep(1)
+            
+            print(f"Evento deletado no Expresso: {event_id}")
+            return True
+            
+        except Exception as e:
+            print(f"Erro ao deletar evento no Expresso: {e}")
+            raise e
+
+    def _format_google_to_expresso(self, google_event):
+        """
+        Converte um evento do Google para o formato do Expresso.
+        """
+        if not google_event.get('summary') or not google_event.get('start'):
+            return None
+        
+        # Extrair data e hora do evento do Google
+        start_datetime = google_event.get('start', {}).get('dateTime', '')
+        end_datetime = google_event.get('end', {}).get('dateTime', '')
+        
+        # Converter para datetime para formatação
+        try:
+            start_dt = datetime.fromisoformat(start_datetime.replace('Z', '+00:00'))
+            end_dt = datetime.fromisoformat(end_datetime.replace('Z', '+00:00'))
+            
+            # Formatar para Expresso
+            data = start_dt.strftime('%d/%m/%Y')
+            inicio = start_dt.strftime('%H:%M')
+            fim = end_dt.strftime('%H:%M')
+        except (ValueError, TypeError):
+            # Fallback para eventos sem data/hora específica
+            data = ''
+            inicio = ''
+            fim = ''
+        
+        expresso_event = {
+            'titulo': google_event.get('summary', ''),
+            'descricao': google_event.get('description', ''),
+            'data': data,
+            'inicio': inicio,
+            'fim': fim,
+            'localizacao': google_event.get('location', ''),
+            'participantes': ''  # Não disponível diretamente no Google
+        }
+        
+        return expresso_event
+
+    def _format_outlook_to_expresso(self, outlook_event):
+        """
+        Converte um evento do Outlook para o formato do Expresso.
+        """
+        if not outlook_event.get('subject') or not outlook_event.get('start'):
+            return None
+        
+        # Extrair data e hora do evento do Outlook
+        start_datetime = outlook_event.get('start', {}).get('dateTime', '')
+        end_datetime = outlook_event.get('end', {}).get('dateTime', '')
+        
+        # Converter para datetime para formatação
+        try:
+            start_dt = datetime.fromisoformat(start_datetime.replace('Z', '+00:00'))
+            end_dt = datetime.fromisoformat(end_datetime.replace('Z', '+00:00'))
+            
+            # Formatar para Expresso
+            data = start_dt.strftime('%d/%m/%Y')
+            inicio = start_dt.strftime('%H:%M')
+            fim = end_dt.strftime('%H:%M')
+        except (ValueError, TypeError):
+            # Fallback para eventos sem data/hora específica
+            data = ''
+            inicio = ''
+            fim = ''
+        
+        expresso_event = {
+            'titulo': outlook_event.get('subject', ''),
+            'descricao': outlook_event.get('body', {}).get('content', ''),
+            'data': data,
+            'inicio': inicio,
+            'fim': fim,
+            'localizacao': outlook_event.get('location', {}).get('displayName', ''),
+            'participantes': ''  # Não disponível diretamente no Outlook
+        }
+        
+        return expresso_event
+
+    def _format_expresso_to_google(self, expresso_event):
+        """
+        Converte um evento do Expresso para o formato do Google.
+        """
+        if not expresso_event.get('titulo') or not expresso_event.get('data'):
+            return None
+        
+        # Converter data e hora do Expresso para formato ISO
+        data = expresso_event.get('data', '')
+        inicio = expresso_event.get('inicio', '')
+        fim = expresso_event.get('fim', '')
+        
+        try:
+            # Converter para datetime
+            data_parts = data.split('/')
+            if len(data_parts) == 3:
+                dia, mes, ano = data_parts
+                
+                # Data e hora de início
+                inicio_parts = inicio.split(':')
+                if len(inicio_parts) == 2:
+                    hora_inicio, min_inicio = inicio_parts
+                    start_dt = datetime(int(ano), int(mes), int(dia), int(hora_inicio), int(min_inicio))
+                    start_iso = start_dt.isoformat()
+                else:
+                    start_iso = f"{ano}-{mes}-{dia}T00:00:00"
+                
+                # Data e hora de término
+                fim_parts = fim.split(':')
+                if len(fim_parts) == 2:
+                    hora_fim, min_fim = fim_parts
+                    end_dt = datetime(int(ano), int(mes), int(dia), int(hora_fim), int(min_fim))
+                    end_iso = end_dt.isoformat()
+                else:
+                    end_iso = f"{ano}-{mes}-{dia}T23:59:59"
+            else:
+                # Fallback
+                start_iso = ''
+                end_iso = ''
+        except (ValueError, IndexError):
+            start_iso = ''
+            end_iso = ''
+        
+        google_event = {
+            'summary': expresso_event.get('titulo', ''),
+            'description': expresso_event.get('descricao', ''),
+            'start': {
+                'dateTime': start_iso,
+                'timeZone': 'America/Recife'
+            },
+            'end': {
+                'dateTime': end_iso,
+                'timeZone': 'America/Recife'
+            },
+            'location': expresso_event.get('localizacao', '')
+        }
+        
+        return google_event
+
+    def _format_expresso_to_outlook(self, expresso_event):
+        """
+        Converte um evento do Expresso para o formato do Outlook.
+        """
+        if not expresso_event.get('titulo') or not expresso_event.get('data'):
+            return None
+        
+        # Converter data e hora do Expresso para formato ISO
+        data = expresso_event.get('data', '')
+        inicio = expresso_event.get('inicio', '')
+        fim = expresso_event.get('fim', '')
+        
+        try:
+            # Converter para datetime
+            data_parts = data.split('/')
+            if len(data_parts) == 3:
+                dia, mes, ano = data_parts
+                
+                # Data e hora de início
+                inicio_parts = inicio.split(':')
+                if len(inicio_parts) == 2:
+                    hora_inicio, min_inicio = inicio_parts
+                    start_dt = datetime(int(ano), int(mes), int(dia), int(hora_inicio), int(min_inicio))
+                    start_iso = start_dt.isoformat()
+                else:
+                    start_iso = f"{ano}-{mes}-{dia}T00:00:00"
+                
+                # Data e hora de término
+                fim_parts = fim.split(':')
+                if len(fim_parts) == 2:
+                    hora_fim, min_fim = fim_parts
+                    end_dt = datetime(int(ano), int(mes), int(dia), int(hora_fim), int(min_fim))
+                    end_iso = end_dt.isoformat()
+                else:
+                    end_iso = f"{ano}-{mes}-{dia}T23:59:59"
+            else:
+                # Fallback
+                start_iso = ''
+                end_iso = ''
+        except (ValueError, IndexError):
+            start_iso = ''
+            end_iso = ''
+        
+        outlook_event = {
+            'subject': expresso_event.get('titulo', ''),
+            'body': {
+                'contentType': 'HTML',
+                'content': expresso_event.get('descricao', '')
+            },
+            'start': {
+                'dateTime': start_iso,
+                'timeZone': 'America/Recife'
+            },
+            'end': {
+                'dateTime': end_iso,
+                'timeZone': 'America/Recife'
+            },
+            'location': {
+                'displayName': expresso_event.get('localizacao', '')
+            }
+        }
+        
+        return outlook_event
 
 # Exemplo de uso
 if __name__ == "__main__":

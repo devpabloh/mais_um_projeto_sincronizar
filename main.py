@@ -2,7 +2,8 @@
 from google_calendar_sync import GoogleCalendarSync 
 from outlook_calendar_sync import OutlookCalendarSync
 from calendar_synchronizer import CalendarSynchronizer
-from datetime import datetime, timedelta
+# Importar o Expresso se estiver usando
+# from vcard_sync2 import sincronizarExpresso
 
 def main():
     # CONFIGURANDO O GOOGLE CALENDAR
@@ -33,8 +34,22 @@ def main():
     # Definir o ID do calendário do Outlook
     outlook_sync.set_calendar_id(outlook_calendar_id)
     
+    # OPCIONAL: Configurar Expresso
+    # expresso_sync = None
+    # try:
+    #     print("\n=== Autenticando no Expresso ===")
+    #     expresso_sync = sincronizarExpresso("seu_usuario", "sua_senha")
+    #     expresso_sync.login()
+    #     expresso_sync.selecionarCalendario()
+    # except Exception as e:
+    #     print(f"Erro ao configurar Expresso: {e}")
+    #     expresso_sync = None
+    
     # Criar o sincronizador
+    # Se não estiver usando o Expresso:
     synchronizer = CalendarSynchronizer(google_sync, outlook_sync)
+    # Se estiver usando o Expresso:
+    # synchronizer = CalendarSynchronizer(google_sync, outlook_sync, expresso_sync)
     
     print("\n=== Iniciando sincronização em tempo real ===")
     print("Este modo irá:")
@@ -44,7 +59,11 @@ def main():
     print("- Verificar mudanças a cada 20 segundos")
     
     # Iniciar sincronização em tempo real
-    synchronizer.start_realtime_sync(interval=20)
+    # Parâmetros:
+    # - interval: tempo entre sincronizações (20 segundos)
+    # - cleanup_interval: tempo entre limpezas (86400 segundos = 1 dia)
+    # - days_to_keep: dias no passado para manter (0 = apenas hoje e futuro)
+    synchronizer.start_realtime_sync(interval=20, cleanup_interval=86400, days_to_keep=0)
 
 if __name__ == "__main__":
     main()
