@@ -117,13 +117,28 @@ class CalendarSynchronizer:
         self.google_to_outlook_map = {}
         self.outlook_to_google_map = {}
         
+        # Adicionar mapas para Expresso
+        self.google_to_expresso_map = {}
+        self.outlook_to_expresso_map = {}
+        self.expresso_to_google_map = {}
+        self.expresso_to_outlook_map = {}
+        
         # Reconstruir a partir do banco de dados
         for mapping in mappings:
-            _, outlook_id, google_id, _, _, _ = mapping
+            _, outlook_id, google_id, expresso_id, _, _ = mapping
             
             if outlook_id and google_id:
                 self.google_to_outlook_map[google_id] = outlook_id
                 self.outlook_to_google_map[outlook_id] = google_id
+            
+            # Adicionar mapeamentos para Expresso
+            if google_id and expresso_id:
+                self.google_to_expresso_map[google_id] = expresso_id
+                self.expresso_to_google_map[expresso_id] = google_id
+                
+            if outlook_id and expresso_id:
+                self.outlook_to_expresso_map[outlook_id] = expresso_id
+                self.expresso_to_outlook_map[expresso_id] = outlook_id
     
     def sync_changes_only(self):
         """Sincroniza apenas as mudanças detectadas desde a última sincronização"""
@@ -155,15 +170,18 @@ class CalendarSynchronizer:
             if mapped_ids is None or (mapped_ids[0] is None and mapped_ids[1] is None):
                 # Verificar correspondência baseada em propriedades
                 outlook_match_found = False
+                expresso_match_found = False
                 
+                # Verificar correspondência com eventos do Outlook
                 for outlook_id, outlook_event in self.outlook_events_cache.items():
                     if self._events_match(google_event, outlook_event):
                         print(f"  - Corresponde a um evento existente no Outlook: {outlook_event.get('subject', 'Sem título')}")
                         self.db.map_events(google_id=event_id, outlook_id=outlook_id, origem='match')
-                        self._store_event_mapping(event_id, outlook_id)
+                        self._store_event_mapping(google_id=event_id, outlook_id=outlook_id)
                         outlook_match_found = True
                         break
                 
+                # Se não tiver match no Outlook, criar evento
                 if not outlook_match_found:
                     try:
                         outlook_event = self._format_google_to_outlook(google_event)
@@ -172,15 +190,40 @@ class CalendarSynchronizer:
                             result = self.outlook_sync.create_event(outlook_event)
                             outlook_id = result.get('id')
                             if outlook_id:
+                                # Primeiro armazenar o evento no banco
+                                self.db.store_outlook_event(result)
+                                # Depois mapear os eventos
                                 self.db.map_events(google_id=event_id, outlook_id=outlook_id, origem='google')
-                                self._store_event_mapping(event_id, outlook_id)
+                                self._store_event_mapping(google_id=event_id, outlook_id=outlook_id)
                                 print(f"  - Criado no Outlook com ID: {outlook_id}")
                                 stats['google_to_outlook']['created'] += 1
                     except Exception as e:
                         print(f"  - Erro ao criar evento no Outlook: {e}")
+                
+                # Verificar e processar Expresso independentemente do Outlook
+                if hasattr(self, 'expresso_sync') and self.expresso_sync:
+                    # Primeiramente, verificar se há match com algum evento do Expresso
+                    expresso_events_cache = {}
+                    expresso_events = self.expresso_sync.obterEventos()
+                    for event in expresso_events:
+                        if 'id' in event:
+                            expresso_events_cache[event['id']] = event
                     
-                    # Se tiver Expresso, criar lá também
-                    if hasattr(self, 'expresso_sync') and self.expresso_sync:
+                    # Verificar match com eventos Expresso
+                    for expresso_id, expresso_event in expresso_events_cache.items():
+                        # Comparar usando critérios similares aos usados em _events_match
+                        google_title = google_event.get('summary', '').strip()
+                        expresso_title = expresso_event.get('titulo', '').strip()
+                        
+                        if google_title.lower() == expresso_title.lower():
+                            print(f"  - Corresponde a um evento existente no Expresso: {expresso_title}")
+                            self.db.map_events(google_id=event_id, expresso_id=expresso_id, origem='match')
+                            self._store_event_mapping(google_id=event_id, expresso_id=expresso_id)
+                            expresso_match_found = True
+                            break
+                
+                    # Se não encontrou match, criar novo evento no Expresso
+                    if not expresso_match_found:
                         try:
                             expresso_event = self.expresso_sync._format_google_to_expresso(google_event)
                             if expresso_event:
@@ -188,11 +231,15 @@ class CalendarSynchronizer:
                                 result = self.expresso_sync.create_event(expresso_event)
                                 expresso_id = result.get('id')
                                 if expresso_id:
+                                    # Aqui também precisamos armazenar o evento no banco antes de mapear
+                                    self.db.store_expresso_event(result)
+                                    # Depois mapear os eventos
                                     self.db.map_events(
                                         google_id=event_id, 
                                         expresso_id=expresso_id, 
                                         origem='google'
                                     )
+                                    self._store_event_mapping(google_id=event_id, expresso_id=expresso_id)
                                     print(f"  - Criado no Expresso com ID: {expresso_id}")
                                     stats['google_to_expresso']['created'] += 1
                         except Exception as e:
@@ -241,7 +288,7 @@ class CalendarSynchronizer:
             for google_id, google_event in self.google_events_cache.items():
                 if self._events_match(google_event, outlook_event):
                     print(f"  - Corresponde a um evento existente no Google: {google_event.get('summary', 'Sem título')}")
-                    self._store_event_mapping(google_id, event_id)
+                    self._store_event_mapping(google_id=google_id, outlook_id=event_id)
                     is_synced_from_google = True
                     break
             
@@ -253,11 +300,64 @@ class CalendarSynchronizer:
                         result = self.google_sync.create_event(google_event)
                         google_id = result.get('id')
                         if google_id:
-                            self._store_event_mapping(google_id, event_id)
+                            # Primeiro armazenar o evento no banco
+                            self.db.store_google_event(result)
+                            # Depois mapear os eventos
+                            self._store_event_mapping(google_id=google_id, outlook_id=event_id)
                             print(f"  - Criado no Google com ID: {google_id}")
                             stats['outlook_to_google']['created'] += 1
                 except Exception as e:
                     print(f"  - Erro ao criar evento no Google: {e}")
+            
+            # Adicionar sincronização com Expresso
+            if hasattr(self, 'expresso_sync') and self.expresso_sync:
+                # Verificar se este evento já tem um mapeamento com Expresso
+                expresso_match_found = False
+                
+                # Verificar no banco de dados
+                mapped_ids = self.db.get_mapped_ids(event_id, 'outlook')
+                if mapped_ids and mapped_ids[1]:  # [1] corresponde ao expresso_id no retorno de get_mapped_ids
+                    print(f"  - Já sincronizado com o Expresso com ID: {mapped_ids[1]}")
+                    expresso_match_found = True
+                
+                if not expresso_match_found:
+                    # Verificar correspondência com eventos do Expresso
+                    expresso_events_cache = {}
+                    expresso_events = self.expresso_sync.obterEventos()
+                    for event in expresso_events:
+                        if 'id' in event:
+                            expresso_events_cache[event['id']] = event
+                    
+                    for expresso_id, expresso_event in expresso_events_cache.items():
+                        # Comparar título
+                        outlook_title = outlook_event.get('subject', '').strip()
+                        expresso_title = expresso_event.get('titulo', '').strip()
+                        
+                        if outlook_title.lower() == expresso_title.lower():
+                            print(f"  - Corresponde a um evento existente no Expresso: {expresso_title}")
+                            self.db.map_events(outlook_id=event_id, expresso_id=expresso_id, origem='match')
+                            self._store_event_mapping(outlook_id=event_id, expresso_id=expresso_id)
+                            expresso_match_found = True
+                            break
+                
+                # Se não encontrou match, criar novo evento no Expresso
+                if not expresso_match_found:
+                    try:
+                        expresso_event = self.expresso_sync._format_outlook_to_expresso(outlook_event)
+                        if expresso_event:
+                            print(f"  - Criando no Expresso: {expresso_event.get('titulo', 'Sem título')}")
+                            result = self.expresso_sync.create_event(expresso_event)
+                            expresso_id = result.get('id')
+                            if expresso_id:
+                                # Armazenar o evento no banco
+                                self.db.store_expresso_event(result)
+                                # Mapear os eventos
+                                self.db.map_events(outlook_id=event_id, expresso_id=expresso_id, origem='outlook')
+                                self._store_event_mapping(outlook_id=event_id, expresso_id=expresso_id)
+                                print(f"  - Criado no Expresso com ID: {expresso_id}")
+                                stats['outlook_to_expresso']['created'] += 1
+                    except Exception as e:
+                        print(f"  - Erro ao criar evento no Expresso: {e}")
         
         # Processar eventos atualizados no Outlook
         for event_id, outlook_event in changes['outlook']['updated'].items():
@@ -322,6 +422,10 @@ class CalendarSynchronizer:
                         result = self.google_sync.create_event(google_event)
                         google_id = result.get('id')
                         if google_id:
+                            # Primeiro armazenar evento na tabela google_events
+                            self.db.store_google_event(result)
+                            
+                            # Depois mapear os eventos
                             self.db.map_events(
                                 expresso_id=event_id,
                                 google_id=google_id,
@@ -340,6 +444,10 @@ class CalendarSynchronizer:
                         result = self.outlook_sync.create_event(outlook_event)
                         outlook_id = result.get('id')
                         if outlook_id:
+                            # Primeiro armazenar evento na tabela outlook_events
+                            self.db.store_outlook_event(result)
+                            
+                            # Depois mapear os eventos
                             self.db.map_events(
                                 expresso_id=event_id,
                                 outlook_id=outlook_id,
@@ -537,16 +645,35 @@ class CalendarSynchronizer:
             
         return google_event
 
-    def _store_event_mapping(self, google_id, outlook_id):
-        """Armazena o mapeamento entre IDs de eventos do Google e Outlook"""
-        print(f"Mapeando evento: Google ID {google_id} <-> Outlook ID {outlook_id}")
+    def _store_event_mapping(self, google_id=None, outlook_id=None, expresso_id=None):
+        """Armazena o mapeamento entre IDs de eventos"""
+        # Imprimir informações de mapeamento
+        mapping_info = []
+        if google_id:
+            mapping_info.append(f"Google ID {google_id}")
+        if outlook_id:
+            mapping_info.append(f"Outlook ID {outlook_id}")
+        if expresso_id:
+            mapping_info.append(f"Expresso ID {expresso_id}")
+            
+        print(f"Mapeando evento: {' <-> '.join(mapping_info)}")
         
         # Armazenar no banco de dados
-        self.db.map_events(google_id=google_id, outlook_id=outlook_id)
+        self.db.map_events(google_id=google_id, outlook_id=outlook_id, expresso_id=expresso_id)
         
         # Também manter nos mapas em memória para compatibilidade
-        self.google_to_outlook_map[google_id] = outlook_id
-        self.outlook_to_google_map[outlook_id] = google_id
+        if google_id and outlook_id:
+            self.google_to_outlook_map[google_id] = outlook_id
+            self.outlook_to_google_map[outlook_id] = google_id
+            
+        # Adicionar mapeamentos para Expresso
+        if google_id and expresso_id:
+            self.google_to_expresso_map[google_id] = expresso_id
+            self.expresso_to_google_map[expresso_id] = google_id
+            
+        if outlook_id and expresso_id:
+            self.outlook_to_expresso_map[outlook_id] = expresso_id
+            self.expresso_to_outlook_map[expresso_id] = outlook_id
 
     def cleanup_database(self, days_to_keep=0):
         """
@@ -565,3 +692,92 @@ class CalendarSynchronizer:
         self._update_caches()
         
         return result
+
+    def _events_match_expresso(self, evento1, evento2, source1, source2):
+        """
+        Verifica se dois eventos correspondem entre si baseado nos tipos de fonte
+        
+        Args:
+            evento1: Primeiro evento
+            evento2: Segundo evento
+            source1: Tipo do primeiro evento ('google', 'outlook', 'expresso')
+            source2: Tipo do segundo evento ('google', 'outlook', 'expresso')
+        """
+        # Extrair títulos dos eventos
+        if source1 == 'google':
+            title1 = evento1.get('summary', '').strip()
+        elif source1 == 'outlook':
+            title1 = evento1.get('subject', '').strip()
+        elif source1 == 'expresso':
+            title1 = evento1.get('titulo', '').strip()
+        else:
+            return False
+            
+        if source2 == 'google':
+            title2 = evento2.get('summary', '').strip()
+        elif source2 == 'outlook':
+            title2 = evento2.get('subject', '').strip()
+        elif source2 == 'expresso':
+            title2 = evento2.get('titulo', '').strip()
+        else:
+            return False
+            
+        # Comparar títulos
+        if not title1 or not title2:
+            return False
+            
+        title_match = title1.lower() == title2.lower()
+        if not title_match:
+            return False
+            
+        # Comparar datas
+        # Extrair data/hora de acordo com o tipo de evento
+        try:
+            if source1 == 'google':
+                start1_str = evento1.get('start', {}).get('dateTime', '')
+                start1 = datetime.fromisoformat(start1_str.replace('Z', '+00:00')) if start1_str else None
+            elif source1 == 'outlook':
+                start1_str = evento1.get('start', {}).get('dateTime', '')
+                start1 = datetime.fromisoformat(start1_str.replace('Z', '+00:00')) if start1_str else None
+            elif source1 == 'expresso':
+                data1 = evento1.get('data', '')
+                inicio1 = evento1.get('inicio', '')
+                if data1 and inicio1 and ':' in inicio1:
+                    dia, mes, ano = data1.split('/')
+                    hora, minuto = inicio1.split(':')
+                    start1 = datetime(int(ano), int(mes), int(dia), int(hora), int(minuto))
+                else:
+                    start1 = None
+                
+            if source2 == 'google':
+                start2_str = evento2.get('start', {}).get('dateTime', '')
+                start2 = datetime.fromisoformat(start2_str.replace('Z', '+00:00')) if start2_str else None
+            elif source2 == 'outlook':
+                start2_str = evento2.get('start', {}).get('dateTime', '')
+                start2 = datetime.fromisoformat(start2_str.replace('Z', '+00:00')) if start2_str else None
+            elif source2 == 'expresso':
+                data2 = evento2.get('data', '')
+                inicio2 = evento2.get('inicio', '')
+                if data2 and inicio2 and ':' in inicio2:
+                    dia, mes, ano = data2.split('/')
+                    hora, minuto = inicio2.split(':')
+                    start2 = datetime(int(ano), int(mes), int(dia), int(hora), int(minuto))
+                else:
+                    start2 = None
+            
+            # Se não foi possível extrair datas, não considerar match
+            if not start1 or not start2:
+                return title_match  # Pelo menos os títulos correspondem
+                
+            # Verificar diferença de tempo (tolerância de 5 minutos)
+            time_diff = abs((start1 - start2).total_seconds())
+            if time_diff > 300:  # 5 minutos
+                return False
+                
+        except (ValueError, TypeError, IndexError, AttributeError) as e:
+            # Se houver erro na comparação de datas, considerar apenas o título
+            print(f"Erro ao comparar datas: {e}")
+            return title_match
+            
+        # Ambos título e data/hora correspondem
+        return True
