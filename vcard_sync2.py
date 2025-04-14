@@ -64,11 +64,11 @@ class sincronizarExpresso:
         
         try:
             # Esperar até que os elementos de eventos estejam presentes
-            wait = WebDriverWait(self.driver, 15)
+            wait = WebDriverWait(self.driver, 30)
             
             # Tentar encontrar os eventos com diferentes seletores
             try:
-                eventos = wait.until(EC.presence_of_all_elements_located((By.CLASS_NAME, "event_entry")))
+                eventos = wait.until(EC.presence_of_all_elements_located((By.CSS_SELECTOR, "div#calendar_event_entry a.event_entry")))
                 print(f"Encontrados {len(eventos)} eventos com class='event_entry'")
             except:
                 print("Não foi possível encontrar elementos com class='event_entry'")
@@ -211,7 +211,7 @@ class sincronizarExpresso:
             # Se não encontrou evento duplicado, continuar com a criação
             # Navegando até a página de criação de eventos
             self.driver.get("https://www.expresso.pe.gov.br/index.php?menuaction=calendar.uicalendar.add&date=20250423")
-            time.sleep(3)
+            time.sleep(10)
             
             # Preenchendo o formulário
             input_titulo = self.driver.find_element(By.XPATH, "//input[@name='cal[title]']")
@@ -238,14 +238,29 @@ class sincronizarExpresso:
             input_data_fim.clear()
             input_data_fim.send_keys(event_data["data"])
 
-            # Dividir o horário de início (formato HH:MM) em horas e minutos
-            horario_inicio = event_data["inicio"]
-            if ":" in horario_inicio:
-                hora_inicio, minuto_inicio = horario_inicio.split(":")
-            else:
-                # Caso não esteja no formato HH:MM
+            # Verificar se é um evento de dia inteiro
+            if event_data.get("dia_inteiro", False):
+                # Para eventos de dia inteiro
                 hora_inicio = "00"
                 minuto_inicio = "00"
+                hora_fim = "00"
+                minuto_fim = "00"
+                # Você também precisa ajustar a data final para o dia seguinte
+            else:
+                # Para eventos normais - seu código atual
+                horario_inicio = event_data["inicio"]
+                if ":" in horario_inicio:
+                    hora_inicio, minuto_inicio = horario_inicio.split(":")
+                else:
+                    hora_inicio = "00"
+                    minuto_inicio = "00"
+
+                horario_fim = event_data["fim"]
+                if ":" in horario_fim:
+                    hora_fim, minuto_fim = horario_fim.split(":")
+                else:
+                    hora_fim = "23"
+                    minuto_fim = "59"
 
             # Selecionando o horário de inicio
             input_horario_inicio_horas = self.driver.find_element(By.XPATH, "//input[@name='start[hour]']")
@@ -256,15 +271,6 @@ class sincronizarExpresso:
             input_horario_inicio_minutos.clear()
             input_horario_inicio_minutos.send_keys(minuto_inicio)
 
-            # Dividir o horário de fim (formato HH:MM) em horas e minutos
-            horario_fim = event_data["fim"]
-            if ":" in horario_fim:
-                hora_fim, minuto_fim = horario_fim.split(":")
-            else:
-                # Caso não esteja no formato HH:MM
-                hora_fim = "23"
-                minuto_fim = "59"
-
             # Selecionando o horário de fim
             input_horario_fim_hora = self.driver.find_element(By.XPATH, "//input[@name='end[hour]']")
             input_horario_fim_hora.clear()
@@ -272,11 +278,12 @@ class sincronizarExpresso:
 
             input_horario_fim_minutos = self.driver.find_element(By.XPATH, "//input[@name='end[min]']")
             input_horario_fim_minutos.clear()
-            input_horario_fim_minutos.send_keys(minuto_fim)
+            input_horario_fim_minutos.send_keys(minuto_fim)  # Primeiro envia os minutos
+            """ input_horario_fim_minutos.send_keys(Keys.RETURN)  # Depois envia o ENTER """
 
-            input_submit_salvar = self.driver.find_element(By.XPATH, "//input[contains(@value, 'salvar') or contains(@value, 'Salvar')]")
+            input_submit_salvar = self.driver.find_element(By.ID, "submit_button")
             input_submit_salvar.click()
-            time.sleep(3)
+            time.sleep(10)
 
             # Tentar obter o ID do evento criado da URL
             current_url = self.driver.current_url
@@ -370,15 +377,16 @@ class sincronizarExpresso:
                     minuto_fim_input.send_keys(hora_fim[1])
                 
                 # Participantes
-                if 'participantes' in event_data and event_data['participantes']:
+                """ if 'participantes' in event_data and event_data['participantes']:
                     participantes_input = self.driver.find_element(By.NAME, 'participants')
                     participantes_input.clear()
-                    participantes_input.send_keys(event_data['participantes'])
+                    participantes_input.send_keys(event_data['participantes']) """
                 
+                #Aqui que eu comentei o código para salvar o evento
                 # Salvar o evento
-                salvar_button = self.driver.find_element(By.XPATH, "//input[@value='Salvar']")
+                salvar_button = self.driver.find_element(By.XPATH, "//input[@id='submit_button']")
                 salvar_button.click()
-                time.sleep(2)
+                time.sleep(10)
                 
                 print(f"Evento atualizado no Expresso: {event_id}")
                 return True
@@ -407,25 +415,25 @@ class sincronizarExpresso:
                 view_url += f"&date={event_data['data']}"
             
             self.driver.get(view_url)
-            time.sleep(2)
+            time.sleep(10)
             
             # Clicar no botão de deletar
             try:
                 botao_deletar = self.driver.find_element(By.XPATH, "//input[@value='remover']")
                 botao_deletar.click()
-                time.sleep(2)
+                time.sleep(10)
             
                 # Aceitar o alerta de confirmação
                 alert = self.driver.switch_to.alert
                 alert.accept()
-                time.sleep(2)
+                time.sleep(10)
             except:
                 # Se não encontrar o botão ou não houver alerta, tentar pressionar Enter
                 try:
                     # Tentar outros possíveis botões
                     botao_deletar = self.driver.find_element(By.XPATH, "//input[@value='Remover']")
                     botao_deletar.click()
-                    time.sleep(2)
+                    time.sleep(10)
                     
                     # Tentar aceitar alerta, se houver
                     try:
@@ -436,7 +444,7 @@ class sincronizarExpresso:
                 except:
                     # Se ainda não conseguir, pressionar Enter
                     self.driver.find_element(By.TAG_NAME, 'body').send_keys(Keys.ENTER)
-                    time.sleep(1)
+                    time.sleep(10)
             
             print(f"Evento deletado no Expresso: {event_id}")
             return True

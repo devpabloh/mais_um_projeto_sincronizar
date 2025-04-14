@@ -126,7 +126,7 @@ def main():
             print(f"Erro durante o teste de sincronização: {e}")
     
     # Iniciar sincronização
-    synchronizer.start_realtime_sync(interval=20, cleanup_interval=86400, days_to_keep=0)
+    synchronizer.start_realtime_sync(interval=60, cleanup_interval=86400, days_to_keep=0)
 
 if __name__ == "__main__":
     main()
