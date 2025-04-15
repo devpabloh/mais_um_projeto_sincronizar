@@ -9,6 +9,7 @@ from urllib.parse import urlparse, parse_qs
 import time
 import keyboard
 from datetime import datetime, timedelta
+import re
 
 # Função para formatar a data
 def formatar_data(data_str):
@@ -56,10 +57,6 @@ class sincronizarExpresso:
         time.sleep(3)
         
     def obterEventos(self):
-        # Adicionar debug para ver a URL atual
-        print(f"URL atual: {self.driver.current_url}")
-        
-        # Aumentar tempo de espera para garantir que a página carregue completamente
         time.sleep(5)
         
         try:
@@ -68,7 +65,7 @@ class sincronizarExpresso:
             
             # Tentar encontrar os eventos com diferentes seletores
             try:
-                eventos = wait.until(EC.presence_of_all_elements_located((By.CSS_SELECTOR, "div#calendar_event_entry a.event_entry")))
+                eventos = wait.until(EC.presence_of_all_elements_located((By.XPATH, "//div[@id='calendar_event_entry']/a[@class='event_entry']")))
                 print(f"Encontrados {len(eventos)} eventos com class='event_entry'")
             except:
                 print("Não foi possível encontrar elementos com class='event_entry'")
@@ -107,17 +104,47 @@ class sincronizarExpresso:
                     tag_url = None
                     print(f"Erro ao extrair URL: {e}")
                 
-                # Extrair horário
+                # Extrair horário - versão mais robusta
                 try:
-                    span_horario = evento.find_element(By.CSS_SELECTOR, "font span")
-                    horario_texto = span_horario.text.strip()
-                    horarios = horario_texto.split('-')
-                    horario_inicio = horarios[0].strip() if len(horarios) > 0 else ""
-                    horario_fim = horarios[1].strip() if len(horarios) > 1 else ""
+                    # Tentar várias abordagens para encontrar o horário
+                    # Abordagem 1: Buscar diretamente por span com cor preta
+                    try:
+                        span_horario = evento.find_element(By.CSS_SELECTOR, "span[style*='color: black']")
+                        horario_texto = span_horario.text.strip()
+                    except:
+                        # Abordagem 2: Buscar font e depois span
+                        try:
+                            font_tag = evento.find_element(By.TAG_NAME, "font")
+                            span_horario = font_tag.find_element(By.TAG_NAME, "span")
+                            horario_texto = span_horario.text.strip()
+                        except:
+                            # Abordagem 3: Tentar extrair de todo o texto da tag font
+                            try:
+                                font_tag = evento.find_element(By.TAG_NAME, "font")
+                                texto_completo = font_tag.text
+                                # Procurar por padrão de hora (HH:MM-HH:MM)
+                                padrao_hora = re.search(r'(\d{1,2}:\d{2})-(\d{1,2}:\d{2})', texto_completo)
+                                if padrao_hora:
+                                    horario_inicio = padrao_hora.group(1)
+                                    horario_fim = padrao_hora.group(2)
+                                else:
+                                    horario_inicio = ""
+                                    horario_fim = ""
+                            except:
+                                horario_inicio = ""
+                                horario_fim = ""
+                
                 except Exception as e:
+                    # Bloco except para o try principal
                     horario_inicio = ""
                     horario_fim = ""
                     print(f"Erro ao extrair horário: {e}")
+                
+                # Se encontrou o texto de horário no formato "14:00-16:00"
+                if 'horario_texto' in locals() and '-' in horario_texto:
+                    horarios = horario_texto.split('-')
+                    horario_inicio = horarios[0].strip()
+                    horario_fim = horarios[1].strip()
                 
                 # Extrair título
                 try:
@@ -172,6 +199,8 @@ class sincronizarExpresso:
                     "participantes": participantes,
                     "tag_url": tag_url
                 }
+                
+                print(f"Horário extraído: início={horario_inicio}, fim={horario_fim}")
                 
                 eventos_lista.append(evento_info)
             
