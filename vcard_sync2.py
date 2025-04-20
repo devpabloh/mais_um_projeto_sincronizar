@@ -274,17 +274,15 @@ class sincronizarExpresso:
                 minuto_inicio = "00"
                 hora_fim = "00"
                 minuto_fim = "00"
-                # Você também precisa ajustar a data final para o dia seguinte
-            else:
-                # Para eventos normais - seu código atual
-                horario_inicio = event_data["inicio"]
+                
+                horario_inicio = event_data.get("inicio", "00:00")
                 if ":" in horario_inicio:
                     hora_inicio, minuto_inicio = horario_inicio.split(":")
                 else:
                     hora_inicio = "00"
                     minuto_inicio = "00"
 
-                horario_fim = event_data["fim"]
+                horario_fim = event_data.get("fim", "23:59")
                 if ":" in horario_fim:
                     hora_fim, minuto_fim = horario_fim.split(":")
                 else:
