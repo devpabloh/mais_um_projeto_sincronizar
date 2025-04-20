@@ -751,14 +751,35 @@ class sincronizarExpresso:
             data_str = expresso_event['data']
             if '/' in data_str:
                 dia, mes, ano = data_str.split('/')
-                data_iso = f"{ano}-{mes}-{dia}"
+                # Para eventos de dia inteiro, a data de término deve ser o dia seguinte às 00:00
+                # Criar objeto de data e adicionar um dia
+                from datetime import datetime, timedelta
+                data_obj = datetime(int(ano), int(mes), int(dia))
+                data_seguinte = data_obj + timedelta(days=1)
+                data_iso_seguinte = data_seguinte.strftime('%Y-%m-%d')
+                
+                outlook_event['end'] = {
+                    'dateTime': f"{data_iso_seguinte}T00:00:00",
+                    'timeZone': 'America/Recife'
+                }
             else:
-                data_iso = data_str
-            
-            outlook_event['end'] = {
-                'dateTime': f"{data_iso}T23:59:59",
-                'timeZone': 'America/Recife'
-            }
+                # Se não conseguir parsear a data, tentar usar a data original + 1 dia
+                try:
+                    from datetime import datetime, timedelta
+                    data_obj = datetime.fromisoformat(data_iso)
+                    data_seguinte = data_obj + timedelta(days=1)
+                    data_iso_seguinte = data_seguinte.strftime('%Y-%m-%d')
+                    
+                    outlook_event['end'] = {
+                        'dateTime': f"{data_iso_seguinte}T00:00:00",
+                        'timeZone': 'America/Recife'
+                    }
+                except:
+                    # Fallback se não conseguir calcular a data seguinte
+                    outlook_event['end'] = {
+                        'dateTime': f"{data_iso}T00:00:00",
+                        'timeZone': 'America/Recife'
+                    }
         
         # Participantes
         if 'participantes' in expresso_event and expresso_event['participantes']:
