@@ -267,43 +267,54 @@ class sincronizarExpresso:
             input_data_fim.clear()
             input_data_fim.send_keys(event_data["data"])
 
+            # Inicializar as variáveis de horário com valores padrão
+            hora_inicio = "00"
+            minuto_inicio = "00"
+            hora_fim = "00"
+            minuto_fim = "00"
+            
             # Verificar se é um evento de dia inteiro
             if event_data.get("dia_inteiro", False):
                 # Para eventos de dia inteiro
                 hora_inicio = "00"
                 minuto_inicio = "00"
-                hora_fim = "00"
-                minuto_fim = "00"
-                
+                hora_fim = "23"
+                minuto_fim = "59"
+            else:
+                # Para eventos com horário específico
                 horario_inicio = event_data.get("inicio", "00:00")
-                if ":" in horario_inicio:
+                if isinstance(horario_inicio, str) and ":" in horario_inicio:
                     hora_inicio, minuto_inicio = horario_inicio.split(":")
-                else:
-                    hora_inicio = "00"
-                    minuto_inicio = "00"
-
+                elif isinstance(horario_inicio, datetime):
+                    hora_inicio = str(horario_inicio.hour).zfill(2)
+                    minuto_inicio = str(horario_inicio.minute).zfill(2)
+                
                 horario_fim = event_data.get("fim", "23:59")
-                if ":" in horario_fim:
+                if isinstance(horario_fim, str) and ":" in horario_fim:
                     hora_fim, minuto_fim = horario_fim.split(":")
-                else:
-                    hora_fim = "23"
-                    minuto_fim = "59"
+                elif isinstance(horario_fim, datetime):
+                    hora_fim = str(horario_fim.hour).zfill(2)
+                    minuto_fim = str(horario_fim.minute).zfill(2)
 
             # Selecionando o horário de inicio
             input_horario_inicio_horas = self.driver.find_element(By.XPATH, "//input[@name='start[hour]']")
+            input_horario_inicio_horas.click()
             input_horario_inicio_horas.clear()
             input_horario_inicio_horas.send_keys(hora_inicio)
 
             input_horario_inicio_minutos = self.driver.find_element(By.XPATH, "//input[@name='start[min]']")
+            input_horario_inicio_minutos.click()
             input_horario_inicio_minutos.clear()
             input_horario_inicio_minutos.send_keys(minuto_inicio)
 
             # Selecionando o horário de fim
             input_horario_fim_hora = self.driver.find_element(By.XPATH, "//input[@name='end[hour]']")
+            input_horario_fim_hora.click()
             input_horario_fim_hora.clear()
             input_horario_fim_hora.send_keys(hora_fim)
 
             input_horario_fim_minutos = self.driver.find_element(By.XPATH, "//input[@name='end[min]']")
+            input_horario_fim_minutos.click()
             input_horario_fim_minutos.clear()
             input_horario_fim_minutos.send_keys(minuto_fim)  # Primeiro envia os minutos
             """ input_horario_fim_minutos.send_keys(Keys.RETURN)  # Depois envia o ENTER """

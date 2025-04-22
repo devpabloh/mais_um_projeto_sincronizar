@@ -110,7 +110,19 @@ class GoogleCalendarSync:
 
     def delete_event(self, event_id):
         """Exclui um evento"""
-        self.service.events().delete(
-            calendarId=self.calendar_id, eventId=event_id
-        ).execute()
-        return True
+        try:
+            print(f"Excluindo do Google: {event_id}")
+            self.service.events().delete(calendarId='primary', eventId=event_id).execute()
+            print(f"Evento {event_id} excluído com sucesso do Google Calendar")
+            return True
+        except HttpError as error:
+            # Verificar se o erro é 410 (Gone) - evento já foi excluído
+            if error.resp.status == 410:
+                print(f"Evento {event_id} já foi excluído do Google Calendar")
+                return True  # Considerar como sucesso, pois o evento não existe mais
+            else:
+                print(f"Erro ao excluir evento do Google: {error}")
+                return False
+        except Exception as e:
+            print(f"Erro ao excluir evento do Google: {e}")
+            return False
