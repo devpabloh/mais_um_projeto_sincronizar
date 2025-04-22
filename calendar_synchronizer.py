@@ -947,3 +947,265 @@ class CalendarSynchronizer:
 
         # Ambos título e data/hora correspondem
         return True
+
+    def _format_google_to_expresso(self, google_event):
+        """Converte um evento do Google para o formato do Expresso"""
+        if not google_event.get("summary") or not google_event.get("start"):
+            return None
+        
+        # Extrair data e hora do evento
+        start_datetime = None
+        end_datetime = None
+        dia_inteiro = False
+        
+        # Verificar se é um evento de dia inteiro
+        if "date" in google_event.get("start", {}):
+            # Evento de dia inteiro
+            start_date = google_event["start"]["date"]
+            end_date = google_event["end"]["date"] if "date" in google_event.get("end", {}) else start_date
+            
+            # Converter para formato DD/MM/YYYY
+            start_dt = datetime.fromisoformat(start_date)
+            data_formatada = start_dt.strftime("%d/%m/%Y")
+            
+            dia_inteiro = True
+            inicio = "00:00"
+            fim = "23:59"
+        else:
+            # Evento com horário específico
+            start_datetime_str = google_event["start"]["dateTime"]
+            end_datetime_str = google_event["end"]["dateTime"]
+            
+            # Converter para objetos datetime
+            start_dt = datetime.fromisoformat(start_datetime_str.replace("Z", "+00:00"))
+            end_dt = datetime.fromisoformat(end_datetime_str.replace("Z", "+00:00"))
+            
+            # Formatar data e hora
+            data_formatada = start_dt.strftime("%d/%m/%Y")
+            inicio = start_dt.strftime("%H:%M")
+            fim = end_dt.strftime("%H:%M")
+            dia_inteiro = False
+        
+        # Criar o evento no formato do Expresso
+        expresso_event = {
+            "titulo": google_event.get("summary", "Sem título"),
+            "descricao": google_event.get("description", "Evento sincronizado do Google Calendar"),
+            "data": data_formatada,
+            "inicio": inicio,
+            "fim": fim,
+            "dia_inteiro": dia_inteiro,
+            "localizacao": google_event.get("location", "")
+        }
+        
+        return expresso_event
+    
+    def _format_outlook_to_expresso(self, outlook_event):
+        """Converte um evento do Outlook para o formato do Expresso"""
+        if not outlook_event.get("subject") or not outlook_event.get("start"):
+            return None
+        
+        # Extrair data e hora do evento
+        start_datetime = None
+        end_datetime = None
+        dia_inteiro = False
+        
+        # Verificar se é um evento de dia inteiro
+        if "dateTime" not in outlook_event.get("start", {}):
+            # Evento de dia inteiro
+            dia_inteiro = True
+            inicio = "00:00"
+            fim = "23:59"
+            
+            # Usar a data como está
+            data_formatada = outlook_event.get("start", {}).get("date", "")
+            
+            # Converter para formato DD/MM/YYYY se necessário
+            if data_formatada and len(data_formatada) == 10:  # formato YYYY-MM-DD
+                dt = datetime.fromisoformat(data_formatada)
+                data_formatada = dt.strftime("%d/%m/%Y")
+        else:
+            # Evento com horário específico
+            start_datetime_str = outlook_event["start"]["dateTime"]
+            end_datetime_str = outlook_event["end"]["dateTime"]
+            
+            # Converter para objetos datetime
+            start_dt = datetime.fromisoformat(start_datetime_str.replace("Z", "+00:00"))
+            end_dt = datetime.fromisoformat(end_datetime_str.replace("Z", "+00:00"))
+            
+            # Formatar data e hora
+            data_formatada = start_dt.strftime("%d/%m/%Y")
+            inicio = start_dt.strftime("%H:%M")
+            fim = end_dt.strftime("%H:%M")
+            dia_inteiro = False
+        
+        # Criar o evento no formato do Expresso
+        expresso_event = {
+            "titulo": outlook_event.get("subject", "Sem título"),
+            "descricao": outlook_event.get("body", {}).get("content", "Evento sincronizado do Outlook Calendar"),
+            "data": data_formatada,
+            "inicio": inicio,
+            "fim": fim,
+            "dia_inteiro": dia_inteiro,
+            "localizacao": outlook_event.get("location", {}).get("displayName", "")
+        }
+        
+        return expresso_event
+
+    def _store_event_mapping(self, google_id=None, outlook_id=None, expresso_id=None):
+        """Armazena o mapeamento entre IDs de eventos"""
+        # Imprimir informações de mapeamento
+        mapping_info = []
+        if google_id:
+            mapping_info.append(f"Google ID {google_id}")
+        if outlook_id:
+            mapping_info.append(f"Outlook ID {outlook_id}")
+        if expresso_id:
+            mapping_info.append(f"Expresso ID {expresso_id}")
+
+        print(f"Mapeando evento: {' <-> '.join(mapping_info)}")
+
+        # Armazenar no banco de dados
+        self.db.map_events(
+            google_id=google_id, outlook_id=outlook_id, expresso_id=expresso_id
+        )
+
+        # Também manter nos mapas em memória para compatibilidade
+        if google_id and outlook_id:
+            self.google_to_outlook_map[google_id] = outlook_id
+            self.outlook_to_google_map[outlook_id] = google_id
+
+        # Adicionar mapeamentos para Expresso
+        if google_id and expresso_id:
+            self.google_to_expresso_map[google_id] = expresso_id
+            self.expresso_to_google_map[expresso_id] = google_id
+
+        if outlook_id and expresso_id:
+            self.outlook_to_expresso_map[outlook_id] = expresso_id
+            self.expresso_to_outlook_map[expresso_id] = outlook_id
+
+    def cleanup_database(self, days_to_keep=0):
+        """
+        Limpa eventos antigos do banco de dados.
+
+        Args:
+            days_to_keep (int): Número de dias passados a manter.
+                               0 = mantém apenas eventos de hoje em diante.
+        """
+        print(f"\n=== Iniciando limpeza do banco de dados ===")
+        print(f"Mantendo eventos de hoje e futuros (+ {days_to_keep} dias no passado)")
+
+        result = self.db.cleanup_old_events(days_to_keep)
+
+        # Após limpar o banco de dados, atualizar os caches em memória
+        self._update_caches()
+
+        return result
+
+    def _events_match_expresso(self, evento1, evento2, source1, source2):
+        """
+        Verifica se dois eventos correspondem entre si baseado nos tipos de fonte
+
+        Args:
+            evento1: Primeiro evento
+            evento2: Segundo evento
+            source1: Tipo do primeiro evento ('google', 'outlook', 'expresso')
+            source2: Tipo do segundo evento ('google', 'outlook', 'expresso')
+        """
+        # Extrair títulos dos eventos
+        if source1 == "google":
+            title1 = evento1.get("summary", "").strip()
+        elif source1 == "outlook":
+            title1 = evento1.get("subject", "").strip()
+        elif source1 == "expresso":
+            title1 = evento1.get("titulo", "").strip()
+        else:
+            return False
+
+        if source2 == "google":
+            title2 = evento2.get("summary", "").strip()
+        elif source2 == "outlook":
+            title2 = evento2.get("subject", "").strip()
+        elif source2 == "expresso":
+            title2 = evento2.get("titulo", "").strip()
+        else:
+            return False
+
+        # Comparar títulos
+        if not title1 or not title2:
+            return False
+
+        title_match = title1.lower() == title2.lower()
+        if not title_match:
+            return False
+
+        # Comparar datas
+        # Extrair data/hora de acordo com o tipo de evento
+        try:
+            if source1 == "google":
+                start1_str = evento1.get("start", {}).get("dateTime", "")
+                start1 = (
+                    datetime.fromisoformat(start1_str.replace("Z", "+00:00"))
+                    if start1_str
+                    else None
+                )
+            elif source1 == "outlook":
+                start1_str = evento1.get("start", {}).get("dateTime", "")
+                start1 = (
+                    datetime.fromisoformat(start1_str.replace("Z", "+00:00"))
+                    if start1_str
+                    else None
+                )
+            elif source1 == "expresso":
+                data1 = evento1.get("data", "")
+                inicio1 = evento1.get("inicio", "")
+                if data1 and inicio1 and ":" in inicio1:
+                    dia, mes, ano = data1.split("/")
+                    hora, minuto = inicio1.split(":")
+                    start1 = datetime(
+                        int(ano), int(mes), int(dia), int(hora), int(minuto)
+                    )
+                else:
+                    start1 = None
+
+            if source2 == "google":
+                start2_str = evento2.get("start", {}).get("dateTime", "")
+                start2 = (
+                    datetime.fromisoformat(start2_str.replace("Z", "+00:00"))
+                    if start2_str
+                    else None
+                )
+            elif source2 == "outlook":
+                start2_str = evento2.get("start", {}).get("dateTime", "")
+                start2 = (
+                    datetime.fromisoformat(start2_str.replace("Z", "+00:00"))
+                    if start2_str
+                    else None
+                )
+            elif source2 == "expresso":
+                data2 = evento2.get("data", "")
+                inicio2 = evento2.get("inicio", "")
+                if data2 and inicio2 and ":" in inicio2:
+                    dia, mes, ano = data2.split("/")
+                    hora, minuto = inicio2.split(":")
+                    start2 = datetime(
+                        int(ano), int(mes), int(dia), int(hora), int(minuto)
+                    )
+                else:
+                    start2 = None
+
+            # Se não foi possível extrair datas, não considerar match
+            if not start1 or not start2:
+                return title_match  # Pelo menos os títulos correspondem
+
+            # Verificar diferença de tempo (tolerância de 5 minutos)
+            time_diff = abs((start1 - start2).total_seconds())
+            if time_diff > 300:  # 5 minutos
+                return False
+
+        except (ValueError, TypeError, IndexError, AttributeError) as e:
+            # Se houver erro na comparação de datas, considerar apenas o título
+            print(f"Erro ao comparar datas: {e}")
+            return title_match
+
+        # Ambos título e data/hora correspondem
+        return True

@@ -226,9 +226,21 @@ class sincronizarExpresso:
                     evento.get('data', '') == event_data.get('data', '')):
                     # Verificar horário com tolerância de 5 minutos
                     hora_evento = evento.get('inicio', '').split(':')
-                    hora_novo = event_data.get('inicio', '').split(':')
                     
-                    if len(hora_evento) == 2 and len(hora_novo) == 2:
+                    # Obter o horário de início do evento a ser criado
+                    hora_novo = None
+                    if 'inicio' in event_data and event_data['inicio']:
+                        if isinstance(event_data['inicio'], str) and ':' in event_data['inicio']:
+                            hora_novo = event_data['inicio'].split(':')
+                        elif isinstance(event_data['inicio'], datetime):
+                            hora_novo = [str(event_data['inicio'].hour), str(event_data['inicio'].minute)]
+                    elif 'hora_inicio' in event_data and event_data['hora_inicio']:
+                        if isinstance(event_data['hora_inicio'], str) and ':' in event_data['hora_inicio']:
+                            hora_novo = event_data['hora_inicio'].split(':')
+                        elif isinstance(event_data['hora_inicio'], datetime):
+                            hora_novo = [str(event_data['hora_inicio'].hour), str(event_data['hora_inicio'].minute)]
+                    
+                    if len(hora_evento) == 2 and hora_novo and len(hora_novo) == 2:
                         minutos_evento = int(hora_evento[0]) * 60 + int(hora_evento[1])
                         minutos_novo = int(hora_novo[0]) * 60 + int(hora_novo[1])
                         
@@ -281,20 +293,38 @@ class sincronizarExpresso:
                 hora_fim = "23"
                 minuto_fim = "59"
             else:
-                # Para eventos com horário específico
-                horario_inicio = event_data.get("inicio", "00:00")
-                if isinstance(horario_inicio, str) and ":" in horario_inicio:
-                    hora_inicio, minuto_inicio = horario_inicio.split(":")
-                elif isinstance(horario_inicio, datetime):
-                    hora_inicio = str(horario_inicio.hour).zfill(2)
-                    minuto_inicio = str(horario_inicio.minute).zfill(2)
+                # Para eventos com horário específico - verificar múltiplos campos possíveis
+                # Primeiro tentar 'inicio'
+                if 'inicio' in event_data and event_data['inicio']:
+                    if isinstance(event_data['inicio'], str) and ":" in event_data['inicio']:
+                        hora_inicio, minuto_inicio = event_data['inicio'].split(":")
+                    elif isinstance(event_data['inicio'], datetime):
+                        hora_inicio = str(event_data['inicio'].hour).zfill(2)
+                        minuto_inicio = str(event_data['inicio'].minute).zfill(2)
+                # Depois tentar 'hora_inicio'
+                elif 'hora_inicio' in event_data and event_data['hora_inicio']:
+                    if isinstance(event_data['hora_inicio'], str) and ":" in event_data['hora_inicio']:
+                        hora_inicio, minuto_inicio = event_data['hora_inicio'].split(":")
+                    elif isinstance(event_data['hora_inicio'], datetime):
+                        hora_inicio = str(event_data['hora_inicio'].hour).zfill(2)
+                        minuto_inicio = str(event_data['hora_inicio'].minute).zfill(2)
+                # Caso contrário, usar o valor padrão já definido
                 
-                horario_fim = event_data.get("fim", "23:59")
-                if isinstance(horario_fim, str) and ":" in horario_fim:
-                    hora_fim, minuto_fim = horario_fim.split(":")
-                elif isinstance(horario_fim, datetime):
-                    hora_fim = str(horario_fim.hour).zfill(2)
-                    minuto_fim = str(horario_fim.minute).zfill(2)
+                # Primeiro tentar 'fim'
+                if 'fim' in event_data and event_data['fim']:
+                    if isinstance(event_data['fim'], str) and ":" in event_data['fim']:
+                        hora_fim, minuto_fim = event_data['fim'].split(":")
+                    elif isinstance(event_data['fim'], datetime):
+                        hora_fim = str(event_data['fim'].hour).zfill(2)
+                        minuto_fim = str(event_data['fim'].minute).zfill(2)
+                # Depois tentar 'hora_fim'
+                elif 'hora_fim' in event_data and event_data['hora_fim']:
+                    if isinstance(event_data['hora_fim'], str) and ":" in event_data['hora_fim']:
+                        hora_fim, minuto_fim = event_data['hora_fim'].split(":")
+                    elif isinstance(event_data['hora_fim'], datetime):
+                        hora_fim = str(event_data['hora_fim'].hour).zfill(2)
+                        minuto_fim = str(event_data['hora_fim'].minute).zfill(2)
+                # Caso contrário, usar o valor padrão já definido
 
             # Selecionando o horário de inicio
             input_horario_inicio_horas = self.driver.find_element(By.XPATH, "//input[@name='start[hour]']")
