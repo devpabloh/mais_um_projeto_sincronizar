@@ -169,6 +169,9 @@ class CalendarSynchronizer:
             f"\n=== Verificando mudanças desde {self.last_sync_time.strftime('%H:%M:%S')} ==="
         )
 
+        # Manter um registro de eventos que estão sendo sincronizados
+        events_being_synced = set()
+
         # Detectar mudanças usando o método existente (que agora também atualiza o banco de dados)
         changes = self._update_caches()
 
@@ -323,19 +326,30 @@ class CalendarSynchronizer:
 
         # Processar eventos excluídos no Google
         for event_id, google_event in changes["google"]["deleted"].items():
+            print(f"Detectada exclusão no Google: {google_event.get('summary', 'Sem título')} (ID: {event_id})")
+            
+            # Verificar mapeamentos para Outlook
             if event_id in self.google_to_outlook_map:
                 outlook_id = self.google_to_outlook_map[event_id]
                 try:
-                    print(
-                        f"Excluindo do Outlook: {google_event.get('summary', 'Sem título')}"
-                    )
+                    print(f"  - Excluindo do Outlook: {outlook_id}")
                     self.outlook_sync.delete_event(outlook_id)
-                    # Remover dos mapeamentos
-                    del self.outlook_to_google_map[outlook_id]
-                    del self.google_to_outlook_map[event_id]
                     stats["google_to_outlook"]["deleted"] += 1
                 except Exception as e:
-                    print(f"Erro ao excluir evento do Outlook: {e}")
+                    print(f"  - Erro ao excluir evento do Outlook: {e}")
+            
+            # Verificar mapeamentos para Expresso
+            if hasattr(self, "expresso_sync") and self.expresso_sync and event_id in self.google_to_expresso_map:
+                expresso_id = self.google_to_expresso_map[event_id]
+                try:
+                    print(f"  - Excluindo do Expresso: {expresso_id}")
+                    self.expresso_sync.delete_event(expresso_id)
+                    stats["google_to_expresso"]["deleted"] += 1
+                except Exception as e:
+                    print(f"  - Erro ao excluir evento do Expresso: {e}")
+            
+            # Remover todos os mapeamentos relacionados
+            self._remove_all_mappings(google_id=event_id)
 
         # Processar eventos adicionados no Outlook
         for event_id, outlook_event in changes["outlook"]["added"].items():
@@ -568,6 +582,9 @@ class CalendarSynchronizer:
             # Também precisamos adicionar código para atualizar eventos do Expresso no Google e Outlook
             # E código para deletar eventos excluídos do Expresso nos outros sistemas
             # (Código omitido por brevidade, mas seguiria a mesma estrutura dos processos de Google/Outlook)
+
+        # Após sincronização completa:
+        events_being_synced.clear()
 
         return stats
 
@@ -802,9 +819,34 @@ class CalendarSynchronizer:
 
         print(f"Mapeando evento: {' <-> '.join(mapping_info)}")
 
-        # Armazenar no banco de dados
+        # Verificar se já existe um mapeamento parcial que possa ser completado
+        existing_mapping = None
+        origem = "sync"
+        
+        if google_id:
+            google_mapping = self.db.get_mapped_ids(google_id, "google")
+            if google_mapping and (google_mapping[0] or google_mapping[1]):
+                existing_mapping = google_mapping
+                outlook_id = outlook_id or google_mapping[0]
+                expresso_id = expresso_id or google_mapping[1]
+        
+        if outlook_id and not existing_mapping:
+            outlook_mapping = self.db.get_mapped_ids(outlook_id, "outlook")
+            if outlook_mapping and (outlook_mapping[0] or outlook_mapping[1]):
+                existing_mapping = outlook_mapping
+                google_id = google_id or outlook_mapping[0]
+                expresso_id = expresso_id or outlook_mapping[1]
+        
+        if expresso_id and not existing_mapping:
+            expresso_mapping = self.db.get_mapped_ids(expresso_id, "expresso")
+            if expresso_mapping and (expresso_mapping[0] or expresso_mapping[1]):
+                existing_mapping = expresso_mapping
+                google_id = google_id or expresso_mapping[1]
+                outlook_id = outlook_id or expresso_mapping[0]
+        
+        # Armazenar no banco de dados com todos os IDs disponíveis
         self.db.map_events(
-            google_id=google_id, outlook_id=outlook_id, expresso_id=expresso_id
+            google_id=google_id, outlook_id=outlook_id, expresso_id=expresso_id, origem=origem
         )
 
         # Também manter nos mapas em memória para compatibilidade
@@ -1051,161 +1093,199 @@ class CalendarSynchronizer:
         
         return expresso_event
 
-    def _store_event_mapping(self, google_id=None, outlook_id=None, expresso_id=None):
-        """Armazena o mapeamento entre IDs de eventos"""
-        # Imprimir informações de mapeamento
-        mapping_info = []
-        if google_id:
-            mapping_info.append(f"Google ID {google_id}")
-        if outlook_id:
-            mapping_info.append(f"Outlook ID {outlook_id}")
-        if expresso_id:
-            mapping_info.append(f"Expresso ID {expresso_id}")
+    def _normalize_event_for_comparison(self, event, source_type):
+        """Normaliza um evento para facilitar a comparação entre diferentes fontes"""
+        normalized = {}
+        
+        # Extrair título normalizado
+        if source_type == 'google':
+            normalized['title'] = event.get('summary', '').strip().lower()
+        elif source_type == 'outlook':
+            normalized['title'] = event.get('subject', '').strip().lower()
+        elif source_type == 'expresso':
+            normalized['title'] = event.get('titulo', '').strip().lower()
+        
+        # Extrair e normalizar data/hora
+        if source_type == 'google':
+            if 'start' in event:
+                if 'dateTime' in event['start']:
+                    dt_str = event['start']['dateTime']
+                    try:
+                        dt = datetime.fromisoformat(dt_str.replace('Z', '+00:00'))
+                        normalized['date'] = dt.date().isoformat()
+                        normalized['time'] = dt.time().strftime('%H:%M')
+                    except:
+                        pass
+        elif source_type == 'outlook':
+            if 'start' in event:
+                if 'dateTime' in event['start']:
+                    dt_str = event['start']['dateTime']
+                    try:
+                        dt = datetime.fromisoformat(dt_str.replace('Z', '+00:00'))
+                        normalized['date'] = dt.date().isoformat()
+                        normalized['time'] = dt.time().strftime('%H:%M')
+                    except:
+                        pass
+        elif source_type == 'expresso':
+            data = event.get('data', '')
+            hora = event.get('inicio', '')
+            
+            if data and '/' in data:
+                try:
+                    dia, mes, ano = data.split('/')
+                    normalized['date'] = f"{ano}-{mes.zfill(2)}-{dia.zfill(2)}"
+                except:
+                    pass
+                
+            if hora and ':' in hora:
+                normalized['time'] = hora
+        
+        return normalized
 
-        print(f"Mapeando evento: {' <-> '.join(mapping_info)}")
+    def _validate_event_data(self, event_data, source_type):
+        required_fields = {
+            'google': ['summary', 'start'],
+            'outlook': ['subject', 'start'],
+            'expresso': ['titulo', 'data', 'inicio']
+        }
+        
+        for field in required_fields[source_type]:
+            if source_type == 'google' or source_type == 'outlook':
+                if field not in event_data:
+                    return False, f"Campo obrigatório ausente: {field}"
+                if field == 'start' and 'dateTime' not in event_data[field]:
+                    return False, f"Campo obrigatório ausente: {field}.dateTime"
+            else:
+                if field not in event_data:
+                    return False, f"Campo obrigatório ausente: {field}"
+        
+        return True, ""
 
-        # Armazenar no banco de dados
-        self.db.map_events(
-            google_id=google_id, outlook_id=outlook_id, expresso_id=expresso_id
-        )
+    def _validate_and_normalize_attendees(self, attendees, target_type):
+        if not attendees:
+            return []
+        
+        validated = []
+        for attendee in attendees:
+            email = None
+            if isinstance(attendee, dict) and 'email' in attendee:
+                email = attendee['email']
+            elif isinstance(attendee, str):
+                email = attendee.strip()
+            
+            # Verificar se o e-mail é válido (formato simples)
+            if email and '@' in email and '.' in email:
+                if target_type == 'google':
+                    validated.append({'email': email})
+                elif target_type == 'outlook':
+                    validated.append({
+                        'emailAddress': {'address': email},
+                        'type': 'required'
+                    })
+        
+        return validated
 
-        # Também manter nos mapas em memória para compatibilidade
-        if google_id and outlook_id:
-            self.google_to_outlook_map[google_id] = outlook_id
-            self.outlook_to_google_map[outlook_id] = google_id
-
-        # Adicionar mapeamentos para Expresso
-        if google_id and expresso_id:
-            self.google_to_expresso_map[google_id] = expresso_id
-            self.expresso_to_google_map[expresso_id] = google_id
-
-        if outlook_id and expresso_id:
-            self.outlook_to_expresso_map[outlook_id] = expresso_id
-            self.expresso_to_outlook_map[expresso_id] = outlook_id
-
-    def cleanup_database(self, days_to_keep=0):
-        """
-        Limpa eventos antigos do banco de dados.
-
-        Args:
-            days_to_keep (int): Número de dias passados a manter.
-                               0 = mantém apenas eventos de hoje em diante.
-        """
-        print(f"\n=== Iniciando limpeza do banco de dados ===")
-        print(f"Mantendo eventos de hoje e futuros (+ {days_to_keep} dias no passado)")
-
-        result = self.db.cleanup_old_events(days_to_keep)
-
-        # Após limpar o banco de dados, atualizar os caches em memória
-        self._update_caches()
-
-        return result
-
-    def _events_match_expresso(self, evento1, evento2, source1, source2):
-        """
-        Verifica se dois eventos correspondem entre si baseado nos tipos de fonte
-
-        Args:
-            evento1: Primeiro evento
-            evento2: Segundo evento
-            source1: Tipo do primeiro evento ('google', 'outlook', 'expresso')
-            source2: Tipo do segundo evento ('google', 'outlook', 'expresso')
-        """
-        # Extrair títulos dos eventos
-        if source1 == "google":
-            title1 = evento1.get("summary", "").strip()
-        elif source1 == "outlook":
-            title1 = evento1.get("subject", "").strip()
-        elif source1 == "expresso":
-            title1 = evento1.get("titulo", "").strip()
-        else:
-            return False
-
-        if source2 == "google":
-            title2 = evento2.get("summary", "").strip()
-        elif source2 == "outlook":
-            title2 = evento2.get("subject", "").strip()
-        elif source2 == "expresso":
-            title2 = evento2.get("titulo", "").strip()
-        else:
-            return False
-
-        # Comparar títulos
-        if not title1 or not title2:
-            return False
-
-        title_match = title1.lower() == title2.lower()
-        if not title_match:
-            return False
-
-        # Comparar datas
-        # Extrair data/hora de acordo com o tipo de evento
+    def _format_expresso_to_google(self, expresso_event):
+        """Converte um evento do Expresso para o formato do Google Calendar"""
+        if not expresso_event.get("titulo") or not expresso_event.get("data"):
+            return None
+        
+        # Extrair data e criar objeto datetime
+        data_str = expresso_event.get("data", "")
+        inicio_str = expresso_event.get("inicio", "")
+        fim_str = expresso_event.get("fim", "")
+        
+        # Extrair componentes da data (formato DD/MM/YYYY)
         try:
-            if source1 == "google":
-                start1_str = evento1.get("start", {}).get("dateTime", "")
-                start1 = (
-                    datetime.fromisoformat(start1_str.replace("Z", "+00:00"))
-                    if start1_str
-                    else None
-                )
-            elif source1 == "outlook":
-                start1_str = evento1.get("start", {}).get("dateTime", "")
-                start1 = (
-                    datetime.fromisoformat(start1_str.replace("Z", "+00:00"))
-                    if start1_str
-                    else None
-                )
-            elif source1 == "expresso":
-                data1 = evento1.get("data", "")
-                inicio1 = evento1.get("inicio", "")
-                if data1 and inicio1 and ":" in inicio1:
-                    dia, mes, ano = data1.split("/")
-                    hora, minuto = inicio1.split(":")
-                    start1 = datetime(
-                        int(ano), int(mes), int(dia), int(hora), int(minuto)
-                    )
-                else:
-                    start1 = None
+            if "/" in data_str:
+                dia, mes, ano = data_str.split("/")
+                data_iso = f"{ano}-{mes.zfill(2)}-{dia.zfill(2)}"
+            else:
+                data_iso = data_str
+            
+            # Criar objeto do evento para o Google
+            google_event = {
+                "summary": expresso_event.get("titulo", "Sem título"),
+                "description": expresso_event.get("descricao", "Evento sincronizado do Expresso"),
+                "location": expresso_event.get("localizacao", ""),
+            }
+            
+            # Verificar se é evento de dia inteiro
+            if expresso_event.get("dia_inteiro", False):
+                google_event["start"] = {"date": data_iso}
+                # Para eventos de dia inteiro, a data de término é o dia seguinte
+                from datetime import datetime, timedelta
+                end_date = (datetime.fromisoformat(data_iso) + timedelta(days=1)).date().isoformat()
+                google_event["end"] = {"date": end_date}
+            else:
+                # Evento com horário específico
+                if inicio_str and ":" in inicio_str:
+                    hora, minuto = inicio_str.split(":")
+                    start_datetime = f"{data_iso}T{hora.zfill(2)}:{minuto.zfill(2)}:00"
+                    google_event["start"] = {
+                        "dateTime": start_datetime,
+                        "timeZone": "America/Recife"
+                    }
+                
+                if fim_str and ":" in fim_str:
+                    hora, minuto = fim_str.split(":")
+                    end_datetime = f"{data_iso}T{hora.zfill(2)}:{minuto.zfill(2)}:00"
+                    google_event["end"] = {
+                        "dateTime": end_datetime,
+                        "timeZone": "America/Recife"
+                    }
+            
+            # Tratar participantes - este é o ponto crítico do erro
+            participantes = expresso_event.get("participantes", "")
+            if participantes:
+                # Validar e normalizar os e-mails dos participantes
+                attendees = self._validate_and_normalize_attendees(participantes.split(','), 'google')
+                if attendees:  # Só incluir se houver participantes válidos
+                    google_event["attendees"] = attendees
+            
+            return google_event
+        except Exception as e:
+            print(f"Erro ao converter evento do Expresso para Google: {e}")
+            return None
 
-            if source2 == "google":
-                start2_str = evento2.get("start", {}).get("dateTime", "")
-                start2 = (
-                    datetime.fromisoformat(start2_str.replace("Z", "+00:00"))
-                    if start2_str
-                    else None
-                )
-            elif source2 == "outlook":
-                start2_str = evento2.get("start", {}).get("dateTime", "")
-                start2 = (
-                    datetime.fromisoformat(start2_str.replace("Z", "+00:00"))
-                    if start2_str
-                    else None
-                )
-            elif source2 == "expresso":
-                data2 = evento2.get("data", "")
-                inicio2 = evento2.get("inicio", "")
-                if data2 and inicio2 and ":" in inicio2:
-                    dia, mes, ano = data2.split("/")
-                    hora, minuto = inicio2.split(":")
-                    start2 = datetime(
-                        int(ano), int(mes), int(dia), int(hora), int(minuto)
-                    )
-                else:
-                    start2 = None
-
-            # Se não foi possível extrair datas, não considerar match
-            if not start1 or not start2:
-                return title_match  # Pelo menos os títulos correspondem
-
-            # Verificar diferença de tempo (tolerância de 5 minutos)
-            time_diff = abs((start1 - start2).total_seconds())
-            if time_diff > 300:  # 5 minutos
-                return False
-
-        except (ValueError, TypeError, IndexError, AttributeError) as e:
-            # Se houver erro na comparação de datas, considerar apenas o título
-            print(f"Erro ao comparar datas: {e}")
-            return title_match
-
-        # Ambos título e data/hora correspondem
-        return True
+    def _remove_all_mappings(self, google_id=None, outlook_id=None, expresso_id=None):
+        """Remove todos os mapeamentos relacionados ao evento"""
+        # Obter todos os IDs mapeados
+        if google_id:
+            mapped_ids = self.db.get_mapped_ids(google_id, "google")
+            if mapped_ids:
+                outlook_id = mapped_ids[0] or outlook_id
+                expresso_id = mapped_ids[1] or expresso_id
+        elif outlook_id:
+            mapped_ids = self.db.get_mapped_ids(outlook_id, "outlook")
+            if mapped_ids:
+                google_id = mapped_ids[0] or google_id
+                expresso_id = mapped_ids[1] or expresso_id
+        elif expresso_id:
+            mapped_ids = self.db.get_mapped_ids(expresso_id, "expresso")
+            if mapped_ids:
+                outlook_id = mapped_ids[0] or outlook_id
+                google_id = mapped_ids[1] or google_id
+        
+        # Remover do banco de dados
+        # Criar um método no DatabaseManager para remover mapeamentos
+        self.db.remove_mapping(google_id=google_id, outlook_id=outlook_id, expresso_id=expresso_id)
+        
+        # Remover dos mapas em memória
+        if google_id and outlook_id:
+            if google_id in self.google_to_outlook_map:
+                del self.google_to_outlook_map[google_id]
+            if outlook_id in self.outlook_to_google_map:
+                del self.outlook_to_google_map[outlook_id]
+        
+        if google_id and expresso_id:
+            if google_id in self.google_to_expresso_map:
+                del self.google_to_expresso_map[google_id]
+            if expresso_id in self.expresso_to_google_map:
+                del self.expresso_to_google_map[expresso_id]
+            
+        if outlook_id and expresso_id:
+            if outlook_id in self.outlook_to_expresso_map:
+                del self.outlook_to_expresso_map[outlook_id]
+            if expresso_id in self.expresso_to_outlook_map:
+                del self.expresso_to_outlook_map[expresso_id]

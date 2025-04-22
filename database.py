@@ -303,63 +303,76 @@ class DatabaseManager:
     ):
         """Criar ou atualizar mapeamento entre eventos"""
         cursor = self.conn.cursor()
-        now = datetime.now().isoformat()
-        mapping_id = None
+        try:
+            # Iniciar transação
+            self.conn.execute("BEGIN TRANSACTION")
+            
+            # Definir a variável now que estava faltando
+            now = datetime.now().isoformat()
+            
+            # Inicializar mapping_id como None
+            mapping_id = None
+            
+            # Procurar mapeamento existente
+            if outlook_id:
+                cursor.execute(
+                    "SELECT id FROM eventos_sincronizados WHERE outlook_event_id = ?",
+                    (outlook_id,),
+                )
+                mapping = cursor.fetchone()
+                if mapping:
+                    mapping_id = mapping[0]
 
-        # Procurar mapeamento existente
-        if outlook_id:
-            cursor.execute(
-                "SELECT id FROM eventos_sincronizados WHERE outlook_event_id = ?",
-                (outlook_id,),
-            )
-            mapping = cursor.fetchone()
-            if mapping:
-                mapping_id = mapping[0]
+            if google_id and not mapping_id:
+                cursor.execute(
+                    "SELECT id FROM eventos_sincronizados WHERE google_event_id = ?",
+                    (google_id,),
+                )
+                mapping = cursor.fetchone()
+                if mapping:
+                    mapping_id = mapping[0]
 
-        if google_id and not mapping_id:
-            cursor.execute(
-                "SELECT id FROM eventos_sincronizados WHERE google_event_id = ?",
-                (google_id,),
-            )
-            mapping = cursor.fetchone()
-            if mapping:
-                mapping_id = mapping[0]
+            if expresso_id and not mapping_id:
+                cursor.execute(
+                    "SELECT id FROM eventos_sincronizados WHERE expresso_event_id = ?",
+                    (expresso_id,),
+                )
+                mapping = cursor.fetchone()
+                if mapping:
+                    mapping_id = mapping[0]
 
-        if expresso_id and not mapping_id:
-            cursor.execute(
-                "SELECT id FROM eventos_sincronizados WHERE expresso_event_id = ?",
-                (expresso_id,),
-            )
-            mapping = cursor.fetchone()
-            if mapping:
-                mapping_id = mapping[0]
+            if mapping_id:
+                # Atualizar mapeamento existente
+                cursor.execute(
+                    """
+                    UPDATE eventos_sincronizados SET
+                    outlook_event_id = COALESCE(?, outlook_event_id),
+                    google_event_id = COALESCE(?, google_event_id),
+                    expresso_event_id = COALESCE(?, expresso_event_id),
+                    ultima_sincronizacao = ?
+                    WHERE id = ?
+                """,
+                    (outlook_id, google_id, expresso_id, now, mapping_id),
+                )
+            else:
+                # Criar novo mapeamento
+                cursor.execute(
+                    """
+                    INSERT INTO eventos_sincronizados (
+                        outlook_event_id, google_event_id, expresso_event_id,
+                        ultima_sincronizacao, origem_criacao
+                    ) VALUES (?, ?, ?, ?, ?)
+                """,
+                    (outlook_id, google_id, expresso_id, now, origem),
+                )
 
-        if mapping_id:
-            # Atualizar mapeamento existente
-            cursor.execute(
-                """
-                UPDATE eventos_sincronizados SET
-                outlook_event_id = COALESCE(?, outlook_event_id),
-                google_event_id = COALESCE(?, google_event_id),
-                expresso_event_id = COALESCE(?, expresso_event_id),
-                ultima_sincronizacao = ?
-                WHERE id = ?
-            """,
-                (outlook_id, google_id, expresso_id, now, mapping_id),
-            )
-        else:
-            # Criar novo mapeamento
-            cursor.execute(
-                """
-                INSERT INTO eventos_sincronizados (
-                    outlook_event_id, google_event_id, expresso_event_id,
-                    ultima_sincronizacao, origem_criacao
-                ) VALUES (?, ?, ?, ?, ?)
-            """,
-                (outlook_id, google_id, expresso_id, now, origem),
-            )
-
-        self.conn.commit()
+            # Confirmar transação
+            self.conn.commit()
+        except Exception as e:
+            # Em caso de erro, reverter
+            self.conn.rollback()
+            print(f"Erro ao mapear eventos: {e}")
+            raise e
 
     def get_mapped_ids(self, event_id, source):
         """Retorna IDs mapeados de um evento"""
@@ -544,3 +557,36 @@ class DatabaseManager:
             "expresso": deleted_expresso,
             "mappings": deleted_mappings,
         }
+
+    def remove_mapping(self, google_id=None, outlook_id=None, expresso_id=None):
+        """Remove mapeamentos de eventos"""
+        cursor = self.conn.cursor()
+        
+        try:
+            # Construir a cláusula WHERE
+            where_clause = []
+            params = []
+            
+            if google_id:
+                where_clause.append("google_event_id = ?")
+                params.append(google_id)
+            
+            if outlook_id:
+                where_clause.append("outlook_event_id = ?")
+                params.append(outlook_id)
+            
+            if expresso_id:
+                where_clause.append("expresso_event_id = ?")
+                params.append(expresso_id)
+            
+            if where_clause:
+                query = f"DELETE FROM eventos_sincronizados WHERE {' OR '.join(where_clause)}"
+                cursor.execute(query, params)
+                self.conn.commit()
+                return cursor.rowcount
+            
+            return 0
+        except Exception as e:
+            self.conn.rollback()
+            print(f"Erro ao remover mapeamento: {e}")
+            return 0

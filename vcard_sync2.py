@@ -846,152 +846,19 @@ class sincronizarExpresso:
         
         return outlook_event
 
-    def _is_duplicate_event(self, event_data, source_type, target_type, target_events):
-        """
-        Verifica se um evento da fonte já existe no calendário de destino.
+    def _is_event_duplicate(self, event, source_type, target_events_cache):
+        """Verifica se um evento já existe no cache de destino"""
+        # Normalizar o evento para comparação
+        normalized_event = self._normalize_event_for_comparison(event, source_type)
         
-        Args:
-            event_data: Os dados do evento da fonte
-            source_type: 'google', 'outlook' ou 'expresso'
-            target_type: 'google', 'outlook' ou 'expresso'
-            target_events: Dicionário de eventos do calendário de destino
-        
-        Returns:
-            tuple: (é_duplicado, id_evento_existente)
-        """
-        # Obter título e data/hora com base no tipo de origem
-        if source_type == 'google':
-            title = event_data.get('summary', '')
-            description = event_data.get('description', '')
-            start_datetime = event_data.get('start', {}).get('dateTime', '')
-            try:
-                start_dt = datetime.fromisoformat(start_datetime.replace('Z', '+00:00'))
-            except (ValueError, TypeError):
-                start_dt = None
-        elif source_type == 'outlook':
-            title = event_data.get('subject', '')
-            description = event_data.get('body', {}).get('content', '') if isinstance(event_data.get('body'), dict) else ''
-            start_datetime = event_data.get('start', {}).get('dateTime', '')
-            try:
-                start_dt = datetime.fromisoformat(start_datetime.replace('Z', '+00:00'))
-            except (ValueError, TypeError):
-                start_dt = None
-        elif source_type == 'expresso':
-            title = event_data.get('titulo', '')
-            description = event_data.get('descricao', '')
-            data = event_data.get('data', '')
-            inicio = event_data.get('inicio', '')
-            try:
-                if data and inicio and ':' in inicio:
-                    dia, mes, ano = data.split('/')
-                    hora, minuto = inicio.split(':')
-                    start_dt = datetime(int(ano), int(mes), int(dia), int(hora), int(minuto))
-                else:
-                    start_dt = None
-            except (ValueError, IndexError):
-                start_dt = None
-        else:
-            return False, None
-        
-        # Se não temos título ou data/hora, não podemos comparar
-        if not title or not start_dt:
-            return False, None
-        
-        print(f"Verificando se evento '{title}' ({start_dt}) já existe no {target_type}...")
-        
-        # Verificar cada evento no destino
-        for event_id, event in target_events.items():
-            # Extrair dados do evento de destino conforme seu tipo
-            if target_type == 'google':
-                target_title = event.get('summary', '')
-                target_description = event.get('description', '')
-                target_start_str = event.get('start', {}).get('dateTime', '')
-                try:
-                    target_start = datetime.fromisoformat(target_start_str.replace('Z', '+00:00'))
-                except (ValueError, TypeError):
-                    target_start = None
-            elif target_type == 'outlook':
-                target_title = event.get('subject', '')
-                target_description = event.get('body', {}).get('content', '') if isinstance(event.get('body'), dict) else ''
-                target_start_str = event.get('start', {}).get('dateTime', '')
-                try:
-                    target_start = datetime.fromisoformat(target_start_str.replace('Z', '+00:00'))
-                except (ValueError, TypeError):
-                    target_start = None
-            elif target_type == 'expresso':
-                target_title = event.get('titulo', '')
-                target_description = event.get('descricao', '')
-                data = event.get('data', '')
-                inicio = event.get('inicio', '')
-                try:
-                    if data and inicio and ':' in inicio:
-                        dia, mes, ano = data.split('/')
-                        hora, minuto = inicio.split(':')
-                        target_start = datetime(int(ano), int(mes), int(dia), int(hora), int(minuto))
-                    else:
-                        target_start = None
-                except (ValueError, IndexError):
-                    target_start = None
-            else:
-                continue
+        # Verificar com cada evento no cache de destino
+        for target_id, target_event in target_events_cache.items():
+            target_normalized = self._normalize_event_for_comparison(target_event, "google" if source_type == "outlook" else "outlook")
             
-            # Sem título ou sem data/hora, não podemos comparar
-            if not target_title or not target_start:
-                continue
-            
-            # VERIFICAÇÃO 1: Títulos idênticos (ignorando case)
-            titles_match = title.lower() == target_title.lower()
-            
-            # VERIFICAÇÃO 2: Verificação de proximidade de título usando distância de Levenshtein
-            # Se os títulos forem muito parecidos (ex: "Reunião" vs "Reuniao"), considerar match
-            title_similarity = 0
-            if not titles_match and len(title) > 3 and len(target_title) > 3:
-                # Calcular semelhança de strings (implementação simples)
-                if len(title) > len(target_title):
-                    title, target_title = target_title, title  # Garantir que title é a menor string
-                
-                # Calcular quantos caracteres são iguais na mesma posição
-                matches = sum(1 for a, b in zip(title.lower(), target_title.lower()) if a == b)
-                if len(title) > 0:
-                    title_similarity = matches / len(title)
-                
-                # Se mais de 80% dos caracteres correspondem, considerar como match
-                titles_match = title_similarity > 0.8
-            
-            # VERIFICAÇÃO 3: Data/hora com tolerância
-            times_match = False
-            if target_start and start_dt:
-                time_diff = abs((start_dt - target_start).total_seconds())
-                # Tolerância de 5 minutos
-                times_match = time_diff <= 300
-            
-            # VERIFICAÇÃO 4: Similaridade de descrição (se ambos tiverem descrição)
-            desc_match = False
-            if description and target_description:
-                # Limpeza básica para comparação
-                desc1 = description.lower().replace('\n', ' ').replace('\r', '').strip()
-                desc2 = target_description.lower().replace('\n', ' ').replace('\r', '').strip()
-                
-                # Se uma descrição contém a outra completamente
-                if desc1 in desc2 or desc2 in desc1:
-                    desc_match = True
-                
-                # Ou se elas compartilham palavras-chave significativas (simples)
-                elif len(desc1) > 10 and len(desc2) > 10:
-                    words1 = set(w for w in desc1.split() if len(w) > 4)  # Palavras com mais de 4 letras
-                    words2 = set(w for w in desc2.split() if len(w) > 4)
-                    if words1 and words2:
-                        common_words = words1.intersection(words2)
-                        if len(common_words) >= 3:  # Se compartilham pelo menos 3 palavras significativas
-                            desc_match = True
-            
-            # Para considerar um evento como duplicado:
-            # 1. Título e horário devem corresponder 
-            # 2. OU título e descrição devem corresponder significativamente
-            if (titles_match and times_match) or (titles_match and desc_match):
-                print(f"  - Evento duplicado encontrado no {target_type}: {target_title} ({target_start})")
-                print(f"  - Similaridade: títulos={titles_match}, horários={times_match}, descrição={desc_match}")
-                return True, event_id
+            # Comparar título e data
+            if (normalized_event['title'] == target_normalized['title']):
+                # Se os títulos são iguais, retornar o ID do evento de destino
+                return True, target_id
         
         return False, None
 
