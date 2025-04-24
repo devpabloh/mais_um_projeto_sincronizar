@@ -632,9 +632,50 @@ class CalendarSynchronizer:
                 except Exception as e:
                     print(f"  - Erro ao criar evento do Expresso no Outlook: {e}")
 
-            # Também precisamos adicionar código para atualizar eventos do Expresso no Google e Outlook
-            # E código para deletar eventos excluídos do Expresso nos outros sistemas
-            # (Código omitido por brevidade, mas seguiria a mesma estrutura dos processos de Google/Outlook)
+            # Detectar eventos excluídos no Expresso
+            if hasattr(self, "expresso_sync") and self.expresso_sync:
+                # Obter IDs de eventos atuais do Expresso
+                expresso_current_ids = set()
+                expresso_events = self.expresso_sync.obterEventos()
+                for event in expresso_events:
+                    if "id" in event:
+                        expresso_current_ids.add(event["id"])
+                
+                # Obter todos os mapeamentos relacionados ao Expresso
+                expresso_mappings = {}
+                for mapping in self.db.get_all_mappings():
+                    _, outlook_id, google_id, expresso_id, _, _ = mapping
+                    if expresso_id:
+                        expresso_mappings[expresso_id] = (google_id, outlook_id)
+                
+                # Detectar IDs que estavam mapeados mas não estão mais nos eventos atuais
+                for expresso_id, (google_id, outlook_id) in expresso_mappings.items():
+                    if expresso_id not in expresso_current_ids:
+                        print(f"Detectada exclusão no Expresso ID: {expresso_id}")
+                        
+                        # Excluir do Google se tiver mapeamento
+                        if google_id:
+                            try:
+                                print(f"  - Excluindo do Google: {google_id}")
+                                self.google_sync.delete_event(google_id)
+                                stats["expresso_to_google"]["deleted"] += 1
+                            except Exception as e:
+                                print(f"  - Erro ao excluir evento do Google: {e}")
+                        
+                        # Excluir do Outlook se tiver mapeamento
+                        if outlook_id:
+                            try:
+                                print(f"  - Excluindo do Outlook: {outlook_id}")
+                                self.outlook_sync.delete_event(outlook_id)
+                                stats["expresso_to_outlook"]["deleted"] += 1
+                            except Exception as e:
+                                print(f"  - Erro ao excluir evento do Outlook: {e}")
+                        
+                        # Remover todos os mapeamentos relacionados
+                        self._remove_all_mappings(expresso_id=expresso_id)
+                        
+                        # Marcar como excluído no banco de dados
+                        self.db.mark_event_deleted(expresso_id, "expresso")
 
         # Após sincronização completa:
         events_being_synced.clear()
