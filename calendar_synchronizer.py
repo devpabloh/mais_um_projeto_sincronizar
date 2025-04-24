@@ -677,6 +677,53 @@ class CalendarSynchronizer:
                         # Marcar como excluído no banco de dados
                         self.db.mark_event_deleted(expresso_id, "expresso")
 
+        # Detectar e processar eventos atualizados no Expresso
+        if hasattr(self, "expresso_sync") and self.expresso_sync:
+            expresso_events_cache = {}
+            expresso_events = self.expresso_sync.obterEventos()
+            
+            # Mapear todos os eventos do Expresso para verificar atualizações
+            for event in expresso_events:
+                if "id" in event:
+                    expresso_id = event["id"]
+                    expresso_events_cache[expresso_id] = event
+                    
+                    # Verificar se este evento tem mapeamento no banco
+                    mapped_ids = self.db.get_mapped_ids(expresso_id, "expresso")
+                    if mapped_ids and (mapped_ids[0] or mapped_ids[1]): # Se tiver Google ID ou Outlook ID mapeado
+                        google_id = mapped_ids[1]  # No retorno do get_mapped_ids para expresso, [1] é o Google ID
+                        outlook_id = mapped_ids[0]  # [0] é o Outlook ID
+                        
+                        # Verificar mudanças no evento do Expresso
+                        # Como não temos um campo de "lastModified" no Expresso, vamos usar um método mais manual
+                        # Podemos obter o evento do banco de dados e comparar campos relevantes
+                        
+                        # Atualizar no Google
+                        if google_id:
+                            try:
+                                # Converter o evento do Expresso para o formato do Google
+                                google_event = self.expresso_sync._format_expresso_to_google(event)
+                                if google_event:
+                                    # Adicionar o campo ID para que a API do Google saiba qual evento atualizar
+                                    google_event["id"] = google_id
+                                    print(f"Atualizando no Google: {google_event.get('summary', 'Sem título')}")
+                                    self.google_sync.update_event(google_id, google_event)
+                                    stats["expresso_to_google"]["updated"] += 1
+                            except Exception as e:
+                                print(f"Erro ao atualizar evento no Google: {e}")
+                        
+                        # Atualizar no Outlook
+                        if outlook_id:
+                            try:
+                                # Converter o evento do Expresso para o formato do Outlook
+                                outlook_event = self.expresso_sync._format_expresso_to_outlook(event)
+                                if outlook_event:
+                                    print(f"Atualizando no Outlook: {outlook_event.get('subject', 'Sem título')}")
+                                    self.outlook_sync.update_event(outlook_id, outlook_event)
+                                    stats["expresso_to_outlook"]["updated"] += 1
+                            except Exception as e:
+                                print(f"Erro ao atualizar evento no Outlook: {e}")
+
         # Após sincronização completa:
         events_being_synced.clear()
 
