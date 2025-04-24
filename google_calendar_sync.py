@@ -113,7 +113,9 @@ class GoogleCalendarSync:
         """Exclui um evento"""
         try:
             print(f"Excluindo do Google: {event_id}")
-            self.service.events().delete(calendarId='primary', eventId=event_id).execute()
+            self.service.events().delete(
+                calendarId="primary", eventId=event_id
+            ).execute()
             print(f"Evento {event_id} excluído com sucesso do Google Calendar")
             return True
         except HttpError as error:

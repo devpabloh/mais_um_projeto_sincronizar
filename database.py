@@ -306,13 +306,13 @@ class DatabaseManager:
         try:
             # Iniciar transação
             self.conn.execute("BEGIN TRANSACTION")
-            
+
             # Definir a variável now que estava faltando
             now = datetime.now().isoformat()
-            
+
             # Inicializar mapping_id como None
             mapping_id = None
-            
+
             # Procurar mapeamento existente
             if outlook_id:
                 cursor.execute(
@@ -561,30 +561,30 @@ class DatabaseManager:
     def remove_mapping(self, google_id=None, outlook_id=None, expresso_id=None):
         """Remove mapeamentos de eventos"""
         cursor = self.conn.cursor()
-        
+
         try:
             # Construir a cláusula WHERE
             where_clause = []
             params = []
-            
+
             if google_id:
                 where_clause.append("google_event_id = ?")
                 params.append(google_id)
-            
+
             if outlook_id:
                 where_clause.append("outlook_event_id = ?")
                 params.append(outlook_id)
-            
+
             if expresso_id:
                 where_clause.append("expresso_event_id = ?")
                 params.append(expresso_id)
-            
+
             if where_clause:
                 query = f"DELETE FROM eventos_sincronizados WHERE {' OR '.join(where_clause)}"
                 cursor.execute(query, params)
                 self.conn.commit()
                 return cursor.rowcount
-            
+
             return 0
         except Exception as e:
             self.conn.rollback()
