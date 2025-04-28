@@ -12,6 +12,7 @@ from datetime import datetime, timedelta
 import re
 
 
+
 # Função para formatar a data
 def formatar_data(data_str):
     # More robust date formatting
