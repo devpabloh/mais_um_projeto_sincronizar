@@ -1039,6 +1039,57 @@ class sincronizarExpresso:
             except Exception as e:
                 print(f"ERRO ao obter eventos do Expresso: {e}")
 
+    def _remove_all_mappings(self, google_id=None, outlook_id=None, expresso_id=None):
+        """Remove todos os mapeamentos relacionados a um ID específico"""
+        # Remover do banco de dados
+        self.db.remove_mapping(google_id=google_id, outlook_id=outlook_id, expresso_id=expresso_id)
+        
+        # Atualizar os mapas em memória
+        if google_id:
+            # Se existe mapeamento Google -> Outlook
+            if google_id in self.google_to_outlook_map:
+                outlook_id_mapped = self.google_to_outlook_map[google_id]
+                del self.google_to_outlook_map[google_id]
+                if outlook_id_mapped in self.outlook_to_google_map:
+                    del self.outlook_to_google_map[outlook_id_mapped]
+            
+            # Se existe mapeamento Google -> Expresso
+            if google_id in self.google_to_expresso_map:
+                expresso_id_mapped = self.google_to_expresso_map[google_id]
+                del self.google_to_expresso_map[google_id]
+                if expresso_id_mapped in self.expresso_to_google_map:
+                    del self.expresso_to_google_map[expresso_id_mapped]
+        
+        if outlook_id:
+            # Se existe mapeamento Outlook -> Google
+            if outlook_id in self.outlook_to_google_map:
+                google_id_mapped = self.outlook_to_google_map[outlook_id]
+                del self.outlook_to_google_map[outlook_id]
+                if google_id_mapped in self.google_to_outlook_map:
+                    del self.google_to_outlook_map[google_id_mapped]
+            
+            # Se existe mapeamento Outlook -> Expresso
+            if outlook_id in self.outlook_to_expresso_map:
+                expresso_id_mapped = self.outlook_to_expresso_map[outlook_id]
+                del self.outlook_to_expresso_map[outlook_id]
+                if expresso_id_mapped in self.expresso_to_outlook_map:
+                    del self.expresso_to_outlook_map[expresso_id_mapped]
+        
+        if expresso_id:
+            # Se existe mapeamento Expresso -> Google
+            if expresso_id in self.expresso_to_google_map:
+                google_id_mapped = self.expresso_to_google_map[expresso_id]
+                del self.expresso_to_google_map[expresso_id]
+                if google_id_mapped in self.google_to_expresso_map:
+                    del self.google_to_expresso_map[google_id_mapped]
+            
+            # Se existe mapeamento Expresso -> Outlook
+            if expresso_id in self.expresso_to_outlook_map:
+                outlook_id_mapped = self.expresso_to_outlook_map[expresso_id]
+                del self.expresso_to_outlook_map[expresso_id]
+                if outlook_id_mapped in self.outlook_to_expresso_map:
+                    del self.outlook_to_expresso_map[outlook_id_mapped]
+
 
 # Exemplo de uso
 if __name__ == "__main__":

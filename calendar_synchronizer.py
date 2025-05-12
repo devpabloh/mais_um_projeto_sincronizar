@@ -1,8 +1,9 @@
 # calendar_synchronizer.py
 from database import DatabaseManager
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 import time
 import re
+import json
 
 # Adicione/modifique estas partes no arquivo calendar_synchronizer.py
 
@@ -232,38 +233,32 @@ class CalendarSynchronizer:
                 outlook_match_found = False
                 expresso_match_found = False
 
-                # Melhor verificação de duplicação: verificar todos os eventos do Outlook
-                for outlook_id, outlook_event in self.outlook_events_cache.items():
-                    if self._events_match(google_event, outlook_event):
-                        print(
-                            f"  - Corresponde a um evento existente no Outlook: {outlook_event.get('subject', 'Sem título')}"
+                # Verificar se o evento já existe no Outlook (usando o novo método)
+                exists, outlook_id = self._check_event_already_exists(google_event, 'google', self.outlook_events_cache, 'outlook')
+                if exists:
+                    print(f"  - Evento já existe no Outlook com ID: {outlook_id}")
+                    self.db.map_events(
+                        google_id=event_id, outlook_id=outlook_id, origem="match"
+                    )
+                    self._store_event_mapping(google_id=event_id, outlook_id=outlook_id)
+                    outlook_match_found = True
+                    
+                    # IMPORTANTE: Se o evento for encontrado, verificar se precisa ser atualizado
+                    # para garantir que as versões estejam sincronizadas
+                    try:
+                        outlook_event_atualizado = self._format_google_to_outlook(
+                            google_event
                         )
-                        self.db.map_events(
-                            google_id=event_id, outlook_id=outlook_id, origem="match"
-                        )
-                        self._store_event_mapping(
-                            google_id=event_id, outlook_id=outlook_id
-                        )
-                        outlook_match_found = True
-
-                        # IMPORTANTE: Se o evento for encontrado, verificar se precisa ser atualizado
-                        # para garantir que as versões estejam sincronizadas
-                        try:
-                            outlook_event_atualizado = self._format_google_to_outlook(
-                                google_event
+                        if outlook_event_atualizado:
+                            print(
+                                f"  - Atualizando no Outlook: {outlook_event_atualizado.get('subject', 'Sem título')}"
                             )
-                            if outlook_event_atualizado:
-                                print(
-                                    f"  - Atualizando no Outlook: {outlook_event_atualizado.get('subject', 'Sem título')}"
-                                )
-                                self.outlook_sync.update_event(
-                                    outlook_id, outlook_event_atualizado
-                                )
-                                stats["google_to_outlook"]["updated"] += 1
-                        except Exception as e:
-                            print(f"  - Erro ao atualizar evento no Outlook: {e}")
-
-                        break
+                            self.outlook_sync.update_event(
+                                outlook_id, outlook_event_atualizado
+                            )
+                            stats["google_to_outlook"]["updated"] += 1
+                    except Exception as e:
+                        print(f"  - Erro ao atualizar evento no Outlook: {e}")
 
                 # Se não tiver match no Outlook, criar evento
                 if not outlook_match_found:
@@ -294,33 +289,30 @@ class CalendarSynchronizer:
 
                 # Verificar e processar Expresso independentemente do Outlook
                 if hasattr(self, "expresso_sync") and self.expresso_sync:
-                    # Primeiramente, verificar se há match com algum evento do Expresso
+                    # Verificar se o evento já existe no Expresso (usando o novo método)
                     expresso_events_cache = {}
-                    expresso_events = self.expresso_sync.obterEventos()
-                    for event in expresso_events:
-                        if "id" in event:
-                            expresso_events_cache[event["id"]] = event
-
-                    # Verificar match com eventos Expresso
-                    for expresso_id, expresso_event in expresso_events_cache.items():
-                        # Comparar usando critérios similares aos usados em _events_match
-                        google_title = google_event.get("summary", "").strip()
-                        expresso_title = expresso_event.get("titulo", "").strip()
-
-                        if google_title.lower() == expresso_title.lower():
-                            print(
-                                f"  - Corresponde a um evento existente no Expresso: {expresso_title}"
-                            )
-                            self.db.map_events(
-                                google_id=event_id,
-                                expresso_id=expresso_id,
-                                origem="match",
-                            )
-                            self._store_event_mapping(
-                                google_id=event_id, expresso_id=expresso_id
-                            )
-                            expresso_match_found = True
-                            break
+                    try:
+                        expresso_events = self.expresso_sync.obterEventos()
+                        for event in expresso_events:
+                            if "id" in event:
+                                expresso_events_cache[event["id"]] = event
+                    except Exception as e:
+                        print(f"  - Erro ao obter eventos do Expresso: {e}")
+                        # Continuar mesmo com erro
+                        
+                    # Verificar duplicação usando o novo método
+                    exists, expresso_id = self._check_event_already_exists(google_event, 'google', expresso_events_cache, 'expresso')
+                    if exists:
+                        print(f"  - Evento já existe no Expresso com ID: {expresso_id}")
+                        self.db.map_events(
+                            google_id=event_id,
+                            expresso_id=expresso_id,
+                            origem="match",
+                        )
+                        self._store_event_mapping(
+                            google_id=event_id, expresso_id=expresso_id
+                        )
+                        expresso_match_found = True
 
                     # Se não encontrou match, criar novo evento no Expresso
                     if not expresso_match_found:
@@ -408,9 +400,17 @@ class CalendarSynchronizer:
         # Processar eventos adicionados no Outlook
         for event_id, outlook_event in changes["outlook"]["added"].items():
             print(
-                f"Processando novo evento do Outlook: {outlook_event.get('subject', 'Sem título')}"
+                f"Processando novo evento do Outlook: {outlook_event.get('subject', 'Sem título')} (ID: {event_id})"
             )
 
+            # Verificar se o evento já foi processado nesta sessão
+            if event_id in events_being_synced:
+                print(f"  - Evento já está sendo processado nesta sessão, ignorando")
+                continue
+            
+            # Adicionar à lista de eventos sendo processados
+            events_being_synced.add(event_id)
+            
             # Verificar se este evento já tem um mapeamento
             if event_id in self.outlook_to_google_map:
                 print(
@@ -418,24 +418,23 @@ class CalendarSynchronizer:
                 )
                 continue
 
-            # Verificar se este é um evento recentemente sincronizado do Google
-            is_synced_from_google = False
-            for google_id, google_event in self.google_events_cache.items():
-                if self._events_match(google_event, outlook_event):
-                    print(
-                        f"  - Corresponde a um evento existente no Google: {google_event.get('summary', 'Sem título')}"
-                    )
-                    self._store_event_mapping(google_id=google_id, outlook_id=event_id)
-                    is_synced_from_google = True
-                    break
-
-            if not is_synced_from_google:
+            # Verificar se este é um evento recentemente sincronizado do Google usando o novo método
+            exists, google_id = self._check_event_already_exists(outlook_event, 'outlook', self.google_events_cache, 'google')
+            if exists:
+                print(f"  - Evento já existe no Google com ID: {google_id}")
+                self._store_event_mapping(google_id=google_id, outlook_id=event_id)
+                is_synced_from_google = True
+            else:
+                is_synced_from_google = False
                 try:
                     google_event = self._format_outlook_to_google(outlook_event)
                     if google_event:
                         print(
                             f"  - Criando no Google: {google_event.get('summary', 'Sem título')}"
                         )
+                        # Log detalhado do evento formatado para depuração
+                        print(f"  - Dados do evento para o Google: {json.dumps(google_event, default=str)}")
+                        
                         result = self.google_sync.create_event(google_event)
                         google_id = result.get("id")
                         if google_id:
@@ -447,8 +446,12 @@ class CalendarSynchronizer:
                             )
                             print(f"  - Criado no Google com ID: {google_id}")
                             stats["outlook_to_google"]["created"] += 1
+                        else:
+                            print("  - ERRO: Não foi possível obter ID do evento criado no Google")
                 except Exception as e:
-                    print(f"  - Erro ao criar evento no Google: {e}")
+                    print(f"  - Erro ao criar evento no Google: {str(e)}")
+                    if hasattr(e, 'response') and hasattr(e.response, 'text'):
+                        print(f"  - Detalhes do erro: {e.response.text}")
 
             # Adicionar sincronização com Expresso
             if hasattr(self, "expresso_sync") and self.expresso_sync:
@@ -464,22 +467,20 @@ class CalendarSynchronizer:
                     expresso_match_found = True
 
                 if not expresso_match_found:
-                    # Verificar correspondência com eventos do Expresso
+                    # Verificar se o evento já existe no Expresso usando o novo método
                     expresso_events_cache = {}
-                    expresso_events = self.expresso_sync.obterEventos()
-                    for event in expresso_events:
-                        if "id" in event:
-                            expresso_events_cache[event["id"]] = event
-
-                    for expresso_id, expresso_event in expresso_events_cache.items():
-                        # Comparar título
-                        outlook_title = outlook_event.get("subject", "").strip()
-                        expresso_title = expresso_event.get("titulo", "").strip()
-
-                        if outlook_title.lower() == expresso_title.lower():
-                            print(
-                                f"  - Corresponde a um evento existente no Expresso: {expresso_title}"
-                            )
+                    try:
+                        expresso_events = self.expresso_sync.obterEventos()
+                        for event in expresso_events:
+                            if "id" in event:
+                                expresso_events_cache[event["id"]] = event
+                        
+                        print(f"  - Encontrados {len(expresso_events_cache)} eventos no Expresso para comparação")
+                        
+                        # Verificar duplicação usando o novo método
+                        exists, expresso_id = self._check_event_already_exists(outlook_event, 'outlook', expresso_events_cache, 'expresso')
+                        if exists:
+                            print(f"  - Evento já existe no Expresso com ID: {expresso_id}")
                             self.db.map_events(
                                 outlook_id=event_id,
                                 expresso_id=expresso_id,
@@ -489,36 +490,46 @@ class CalendarSynchronizer:
                                 outlook_id=event_id, expresso_id=expresso_id
                             )
                             expresso_match_found = True
-                            break
-
-                # Se não encontrou match, criar novo evento no Expresso
-                if not expresso_match_found:
-                    try:
-                        expresso_event = self.expresso_sync._format_outlook_to_expresso(
-                            outlook_event
-                        )
-                        if expresso_event:
-                            print(
-                                f"  - Criando no Expresso: {expresso_event.get('titulo', 'Sem título')}"
-                            )
-                            result = self.expresso_sync.create_event(expresso_event)
-                            expresso_id = result.get("id")
-                            if expresso_id:
-                                # Armazenar o evento no banco
-                                self.db.store_expresso_event(result)
-                                # Mapear os eventos
-                                self.db.map_events(
-                                    outlook_id=event_id,
-                                    expresso_id=expresso_id,
-                                    origem="outlook",
-                                )
-                                self._store_event_mapping(
-                                    outlook_id=event_id, expresso_id=expresso_id
-                                )
-                                print(f"  - Criado no Expresso com ID: {expresso_id}")
-                                stats["outlook_to_expresso"]["created"] += 1
                     except Exception as e:
-                        print(f"  - Erro ao criar evento no Expresso: {e}")
+                        print(f"  - Erro ao obter eventos do Expresso: {str(e)}")
+                        # Continuar mesmo com erro, tentando criar o evento no Expresso
+
+                    # Se não encontrou match, criar novo evento no Expresso
+                    if not expresso_match_found:
+                        try:
+                            expresso_event = self._format_outlook_to_expresso(
+                                outlook_event
+                            )
+                            if expresso_event:
+                                print(
+                                    f"  - Criando no Expresso: {expresso_event.get('titulo', 'Sem título')}"
+                                )
+                                # Log detalhado para depuração
+                                print(f"  - Dados do evento para o Expresso: {json.dumps(expresso_event, default=str)}")
+                                
+                                result = self.expresso_sync.create_event(expresso_event)
+                                expresso_id = result.get("id") if isinstance(result, dict) else result
+                                if expresso_id:
+                                    # Armazenar o evento no banco
+                                    self.db.store_expresso_event(result if isinstance(result, dict) else {"id": expresso_id})
+                                    # Mapear os eventos
+                                    self.db.map_events(
+                                        outlook_id=event_id,
+                                        expresso_id=expresso_id,
+                                        origem="outlook",
+                                    )
+                                    self._store_event_mapping(
+                                        outlook_id=event_id, expresso_id=expresso_id
+                                    )
+                                    print(f"  - Criado no Expresso com ID: {expresso_id}")
+                                    stats["outlook_to_expresso"]["created"] += 1
+                                else:
+                                    print("  - ERRO: Não foi possível obter ID do evento criado no Expresso")
+                            else:
+                                print("  - ERRO: Falha ao formatar evento do Outlook para o Expresso")
+                        except Exception as e:
+                            print(f"  - Erro ao criar evento no Expresso: {str(e)}")
+                            # Continuar a execução mesmo após erro
 
         # Processar eventos atualizados no Outlook
         for event_id, outlook_event in changes["outlook"]["updated"].items():
@@ -788,14 +799,31 @@ class CalendarSynchronizer:
             # Verificar se já existe um mapeamento no banco de dados
             mapped_ids = self.db.get_mapped_ids(google_id, "google")
             if mapped_ids and mapped_ids[0] == outlook_id:
+                print(f"Match por ID no banco: Google {google_id} -> Outlook {outlook_id}")
                 return True
             
             mapped_ids = self.db.get_mapped_ids(outlook_id, "outlook")
             if mapped_ids and mapped_ids[0] == google_id:
+                print(f"Match por ID no banco: Outlook {outlook_id} -> Google {google_id}")
                 return True
+            
+            # Verificar se há IDs externos armazenados nos eventos
+            # Outlook em Google
+            if "extendedProperties" in google_event and "private" in google_event["extendedProperties"]:
+                private_props = google_event["extendedProperties"]["private"]
+                if "outlook_id" in private_props and private_props["outlook_id"] == outlook_id:
+                    print(f"Match por ID externo: Google contém Outlook ID {outlook_id}")
+                    return True
+            
+            # Google em Outlook (depende de como os IDs são armazenados no Outlook)
+            # Este é apenas um exemplo, pode não ser aplicável dependendo da API
+            if "singleValueExtendedProperties" in outlook_event:
+                for prop in outlook_event["singleValueExtendedProperties"]:
+                    if prop.get("name") == "google_id" and prop.get("value") == google_id:
+                        print(f"Match por ID externo: Outlook contém Google ID {google_id}")
+                        return True
         
-        # Se não encontrar mapeamento, continuar com a verificação por conteúdo
-        # Resto do código existente...
+        # Se não encontrar mapeamento por ID, continuar com a verificação por conteúdo
         
         # Comparar título
         google_title = google_event.get("summary", "").strip()
@@ -806,28 +834,67 @@ class CalendarSynchronizer:
 
         title_match = google_title.lower() == outlook_title.lower()
         if not title_match:
-            return False
+            # Se os títulos não correspondem exatamente, podemos verificar se um contém o outro
+            # para eventos que podem ter sido editados ligeiramente
+            if (google_title.lower() in outlook_title.lower() or 
+                outlook_title.lower() in google_title.lower()) and (
+                len(google_title) > 5 and len(outlook_title) > 5):  # Evitar falsos positivos com títulos muito curtos
+                title_match = True
+                # Neste caso, os títulos são similares mas não idênticos
+                print(f"Títulos similares: '{google_title}' e '{outlook_title}'")
+                # Neste caso, precisamos verificar a data/hora com maior rigor
+                # para ter certeza de que é o mesmo evento
+            else:
+                return False
         
         # Comparar data/hora com maior precisão
         google_start = google_event.get("start", {}).get("dateTime", "")
         outlook_start = outlook_event.get("start", {}).get("dateTime", "")
         
+        # Verificar se ambos são eventos de dia inteiro
+        google_all_day = "date" in google_event.get("start", {}) and "dateTime" not in google_event.get("start", {})
+        outlook_all_day = "date" in outlook_event.get("start", {}) and "dateTime" not in outlook_event.get("start", {})
+        
+        # Se ambos forem de dia inteiro, comparar as datas
+        if google_all_day and outlook_all_day:
+            google_date = google_event.get("start", {}).get("date", "")
+            outlook_date = outlook_event.get("start", {}).get("date", "")
+            if google_date and outlook_date:
+                date_match = google_date == outlook_date
+                if date_match:
+                    print(f"Match de eventos de dia inteiro: {google_date}")
+                    return True
+                else:
+                    return False
+        
+        # Se chegou aqui, pelo menos um dos eventos não é de dia inteiro
         if google_start and outlook_start:
             try:
                 google_dt = datetime.fromisoformat(google_start.replace("Z", "+00:00"))
                 outlook_dt = datetime.fromisoformat(outlook_start.replace("Z", "+00:00"))
                 
+                # Converter para UTC para comparação adequada
+                if hasattr(google_dt, "tzinfo") and google_dt.tzinfo:
+                    google_dt = google_dt.astimezone(timezone.utc)
+                if hasattr(outlook_dt, "tzinfo") and outlook_dt.tzinfo:
+                    outlook_dt = outlook_dt.astimezone(timezone.utc)
+                
                 # Tolerância de 5 minutos (300 segundos)
                 time_diff = abs((google_dt - outlook_dt).total_seconds())
                 if time_diff > 300:
+                    print(f"Horários diferem por {time_diff} segundos")
                     return False
                 
                 # Se chegou aqui, título e horário correspondem
+                print(f"Match de evento com horário específico: '{google_title}' em {google_dt}")
                 return True
-            except (ValueError, TypeError):
-                pass
+            except (ValueError, TypeError) as e:
+                print(f"Erro ao comparar datas: {e}")
+                # Se houver erro na conversão de data/hora, verificar só o título
+                return title_match
         
-        # Se não foi possível comparar data/hora, verificar apenas o título
+        # Se chegou aqui e nenhuma das verificações definiu um match ou não-match,
+        # retornar o resultado da verificação de título
         return title_match
 
     def start_realtime_sync(self, interval=20, cleanup_interval=86400, days_to_keep=0):
@@ -1055,407 +1122,169 @@ class CalendarSynchronizer:
 
         return result
 
-    def _events_match_expresso(self, evento1, evento2, source1, source2):
+    def _check_event_already_exists(self, event, source_type, target_cache, target_type=None):
         """
-        Verifica se dois eventos correspondem entre si baseado nos tipos de fonte
-
+        Verifica se um evento já existe no cache de destino
+        
         Args:
-            evento1: Primeiro evento
-            evento2: Segundo evento
-            source1: Tipo do primeiro evento ('google', 'outlook', 'expresso')
-            source2: Tipo do segundo evento ('google', 'outlook', 'expresso')
+            event: Evento a verificar
+            source_type: Tipo do evento origem ('google', 'outlook', 'expresso')
+            target_cache: Cache de eventos de destino para verificação
+            target_type: Tipo do evento de destino ('google', 'outlook', 'expresso')
+            
+        Returns:
+            (bool, str): Tupla com (existe?, id do evento correspondente)
         """
-        # Extrair títulos dos eventos
-        if source1 == "google":
-            title1 = evento1.get("summary", "").strip()
-        elif source1 == "outlook":
-            title1 = evento1.get("subject", "").strip()
-        elif source1 == "expresso":
-            title1 = evento1.get("titulo", "").strip()
+        print(f"Verificando duplicação de evento tipo '{source_type}' em '{target_type or 'destino'}'...")
+        
+        if not target_type:
+            if source_type == 'google':
+                target_type = 'outlook'
+            elif source_type == 'outlook':
+                target_type = 'google'
+            else:
+                target_type = 'google'  # Default para Expresso
+        
+        # Se não tiver título, não podemos comparar adequadamente
+        event_title = None
+        if source_type == 'google':
+            event_title = event.get('summary', '').strip()
+        elif source_type == 'outlook':
+            event_title = event.get('subject', '').strip()
+        elif source_type == 'expresso':
+            event_title = event.get('titulo', '').strip()
+            
+        if not event_title:
+            print(f"  - Evento sem título, não é possível verificar duplicação")
+            return False, None
         else:
-            return False
-
-        if source2 == "google":
-            title2 = evento2.get("summary", "").strip()
-        elif source2 == "outlook":
-            title2 = evento2.get("subject", "").strip()
-        elif source2 == "expresso":
-            title2 = evento2.get("titulo", "").strip()
-        else:
-            return False
-
-        # Comparar títulos
-        if not title1 or not title2:
-            return False
-
-        title_match = title1.lower() == title2.lower()
-        if not title_match:
-            return False
-
-        # Comparar datas
-        # Extrair data/hora de acordo com o tipo de evento
+            print(f"  - Verificando evento com título: '{event_title}'")
+            
+        # Extração de data/hora depende do tipo de evento
+        event_datetime = None
         try:
-            if source1 == "google":
-                start1_str = evento1.get("start", {}).get("dateTime", "")
-                start1 = (
-                    datetime.fromisoformat(start1_str.replace("Z", "+00:00"))
-                    if start1_str
-                    else None
-                )
-            elif source1 == "outlook":
-                start1_str = evento1.get("start", {}).get("dateTime", "")
-                start1 = (
-                    datetime.fromisoformat(start1_str.replace("Z", "+00:00"))
-                    if start1_str
-                    else None
-                )
-            elif source1 == "expresso":
-                data1 = evento1.get("data", "")
-                inicio1 = evento1.get("inicio", "")
-                if data1 and inicio1 and ":" in inicio1:
-                    dia, mes, ano = data1.split("/")
-                    hora, minuto = inicio1.split(":")
-                    start1 = datetime(
-                        int(ano), int(mes), int(dia), int(hora), int(minuto)
-                    )
+            if source_type == 'google':
+                if 'dateTime' in event.get('start', {}):
+                    dt_str = event['start']['dateTime']
+                    event_datetime = datetime.fromisoformat(dt_str.replace("Z", "+00:00"))
+                    print(f"  - Data/hora do evento: {event_datetime}")
+                elif 'date' in event.get('start', {}):
+                    # Evento de dia inteiro
+                    dt_str = event['start']['date']
+                    event_datetime = datetime.fromisoformat(dt_str)
+                    print(f"  - Data do evento (dia inteiro): {event_datetime}")
+            elif source_type == 'outlook':
+                if 'dateTime' in event.get('start', {}):
+                    dt_str = event['start']['dateTime']
+                    event_datetime = datetime.fromisoformat(dt_str.replace("Z", "+00:00"))
+                    print(f"  - Data/hora do evento: {event_datetime}")
+                elif 'date' in event.get('start', {}):
+                    # Evento de dia inteiro
+                    dt_str = event['start']['date']
+                    event_datetime = datetime.fromisoformat(dt_str)
+                    print(f"  - Data do evento (dia inteiro): {event_datetime}")
+            elif source_type == 'expresso':
+                if 'data' in event and 'inicio' in event:
+                    data = event['data']
+                    hora = event['inicio']
+                    if data and hora and ':' in hora:
+                        dia, mes, ano = data.split('/')
+                        hora, minuto = hora.split(':')
+                        event_datetime = datetime(int(ano), int(mes), int(dia), int(hora), int(minuto))
+                        print(f"  - Data/hora do evento: {event_datetime}")
+        except (ValueError, TypeError, IndexError) as e:
+            print(f"  - Erro ao extrair data/hora: {e}")
+            # Continuar apenas com verificação de título
+            
+        print(f"  - Cache destino ({target_type}) tem {len(target_cache)} eventos para comparar")
+        
+        # Verificar cada evento no cache de destino
+        for target_id, target_event in target_cache.items():
+            # Extrair título do evento de destino
+            target_title = None
+            if target_type == 'google':
+                target_title = target_event.get('summary', '').strip()
+            elif target_type == 'outlook':
+                target_title = target_event.get('subject', '').strip()
+            elif target_type == 'expresso':
+                target_title = target_event.get('titulo', '').strip()
+                
+            if not target_title:
+                continue
+                
+            # Verificar correspondência de título
+            title_match = event_title.lower() == target_title.lower()
+            if not title_match:
+                # Verificar títulos similares
+                if (event_title.lower() in target_title.lower() or 
+                    target_title.lower() in event_title.lower()) and (
+                    len(event_title) > 5 and len(target_title) > 5):
+                    title_match = True
+                    print(f"  - Títulos similares: '{event_title}' e '{target_title}'")
                 else:
-                    start1 = None
-
-            if source2 == "google":
-                start2_str = evento2.get("start", {}).get("dateTime", "")
-                start2 = (
-                    datetime.fromisoformat(start2_str.replace("Z", "+00:00"))
-                    if start2_str
-                    else None
-                )
-            elif source2 == "outlook":
-                start2_str = evento2.get("start", {}).get("dateTime", "")
-                start2 = (
-                    datetime.fromisoformat(start2_str.replace("Z", "+00:00"))
-                    if start2_str
-                    else None
-                )
-            elif source2 == "expresso":
-                data2 = evento2.get("data", "")
-                inicio2 = evento2.get("inicio", "")
-                if data2 and inicio2 and ":" in inicio2:
-                    dia, mes, ano = data2.split("/")
-                    hora, minuto = inicio2.split(":")
-                    start2 = datetime(
-                        int(ano), int(mes), int(dia), int(hora), int(minuto)
-                    )
-                else:
-                    start2 = None
-
-            # Se não foi possível extrair datas, não considerar match
-            if not start1 or not start2:
-                return title_match  # Pelo menos os títulos correspondem
-
-            # Verificar diferença de tempo (tolerância de 5 minutos)
-            time_diff = abs((start1 - start2).total_seconds())
-            if time_diff > 300:  # 5 minutos
-                return False
-
-        except (ValueError, TypeError, IndexError, AttributeError) as e:
-            # Se houver erro na comparação de datas, considerar apenas o título
-            print(f"Erro ao comparar datas: {e}")
-            return title_match
-
-        # Ambos título e data/hora correspondem
-        return True
-
-    def _validate_email(self, email):
-        """Valida se um e-mail está em formato válido"""
-        # Remover espaços em branco
-        email = email.strip()
-        
-        # Padrão básico de validação de e-mail
-        pattern = r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$'
-        
-        # Verificar se o e-mail corresponde ao padrão
-        if not re.match(pattern, email):
-            return False
-        
-        # Verificar se o domínio tem pelo menos um ponto
-        if '.' not in email.split('@')[1]:
-            return False
-        
-        return True
-
-    def _format_expresso_to_google(self, expresso_event):
-        """Converte um evento do Expresso para o formato do Google Calendar"""
-        google_event = {}
-
-        # Título do evento
-        if "titulo" in expresso_event:
-            google_event["summary"] = expresso_event["titulo"]
-
-        # Descrição do evento
-        if "descricao" in expresso_event:
-            google_event["description"] = expresso_event["descricao"]
-
-        # Data e hora
-        if "data" in expresso_event:
-            data_str = expresso_event["data"]
-
-            # Convertendo data do formato DD/MM/YYYY para YYYY-MM-DD
-            if "/" in data_str:
-                dia, mes, ano = data_str.split("/")
-                data_iso = f"{ano}-{mes.zfill(2)}-{dia.zfill(2)}"  # Garantir dois dígitos
+                    continue
             else:
-                data_iso = data_str
-
-            if "inicio" in expresso_event:  # Mudança aqui: usando 'inicio' em vez de 'hora_inicio'
-                # Evento com horário específico
-                hora_inicio = expresso_event["inicio"]
-                if isinstance(hora_inicio, datetime):
-                    start_iso = hora_inicio.isoformat()
-                else:
-                    # Assumindo formato HH:MM
-                    hora, minuto = hora_inicio.split(":")
-                    start_iso = f"{data_iso}T{hora.zfill(2)}:{minuto.zfill(2)}:00"
-
-                google_event["start"] = {
-                    "dateTime": start_iso,
-                    "timeZone": "America/Recife"
-                }
+                print(f"  - Títulos idênticos: '{event_title}' e '{target_title}'")
+                    
+            # Se não temos data/hora para comparar, retornar com base apenas no título
+            if not event_datetime:
+                print(f"  - Match por título: '{event_title}' = '{target_title}'")
+                return True, target_id
+                
+            # Extrair data/hora do evento de destino
+            target_datetime = None
+            try:
+                if target_type == 'google':
+                    if 'dateTime' in target_event.get('start', {}):
+                        dt_str = target_event['start']['dateTime']
+                        target_datetime = datetime.fromisoformat(dt_str.replace("Z", "+00:00"))
+                        print(f"  - Data/hora do evento destino: {target_datetime}")
+                    elif 'date' in target_event.get('start', {}):
+                        dt_str = target_event['start']['date']
+                        target_datetime = datetime.fromisoformat(dt_str)
+                        print(f"  - Data do evento destino (dia inteiro): {target_datetime}")
+                elif target_type == 'outlook':
+                    if 'dateTime' in target_event.get('start', {}):
+                        dt_str = target_event['start']['dateTime']
+                        target_datetime = datetime.fromisoformat(dt_str.replace("Z", "+00:00"))
+                        print(f"  - Data/hora do evento destino: {target_datetime}")
+                    elif 'date' in target_event.get('start', {}):
+                        dt_str = target_event['start']['date']
+                        target_datetime = datetime.fromisoformat(dt_str)
+                        print(f"  - Data do evento destino (dia inteiro): {target_datetime}")
+                elif target_type == 'expresso':
+                    if 'data' in target_event and 'inicio' in target_event:
+                        data = target_event['data']
+                        hora = target_event['inicio']
+                        if data and hora and ':' in hora:
+                            dia, mes, ano = data.split('/')
+                            hora, minuto = hora.split(':')
+                            target_datetime = datetime(int(ano), int(mes), int(dia), int(hora), int(minuto))
+                            print(f"  - Data/hora do evento destino: {target_datetime}")
+            except (ValueError, TypeError, IndexError) as e:
+                print(f"  - Erro ao extrair data/hora do evento de destino: {e}")
+                # Se não conseguimos extrair a data do destino, consideramos o match pelo título
+                print(f"  - Match apenas por título (erro na data): '{event_title}'")
+                return True, target_id
+                
+            # Se não conseguimos extrair a data do evento de destino
+            if not target_datetime:
+                print(f"  - Match apenas por título (destino sem data): '{event_title}'")
+                return True, target_id
+                
+            # Comparar as datas/horas com tolerância de 24 horas (86400 segundos)
+            # Usar tolerância maior para evitar duplicações devido a diferenças de fuso horário
+            time_diff = abs((event_datetime - target_datetime).total_seconds())
+            if time_diff <= 86400:  # 24 horas
+                print(f"  - Match completo (título e data) para evento: '{event_title}' em {event_datetime}")
+                print(f"  - Diferença de tempo: {time_diff} segundos ({time_diff/3600:.2f} horas)")
+                return True, target_id
             else:
-                # Evento de dia inteiro
-                google_event["start"] = {"date": data_iso}
-
-            # Hora de término
-            if "fim" in expresso_event:  # Mudança aqui: usando 'fim' em vez de 'hora_fim'
-                hora_fim = expresso_event["fim"]
-                if isinstance(hora_fim, datetime):
-                    end_iso = hora_fim.isoformat()
-                else:
-                    # Assumindo formato HH:MM
-                    hora, minuto = hora_fim.split(":")
-                    end_iso = f"{data_iso}T{hora.zfill(2)}:{minuto.zfill(2)}:00"
-
-                google_event["end"] = {
-                    "dateTime": end_iso,
-                    "timeZone": "America/Recife"
-                }
-            elif "start" in google_event and "date" in google_event["start"]:
-                # Para eventos de dia inteiro, a data de término é o dia seguinte
-                end_date = (
-                    (datetime.fromisoformat(google_event["start"]["date"]) + timedelta(days=1))
-                    .date()
-                    .isoformat()
-                )
-                google_event["end"] = {"date": end_date}
-
-        # Participantes - com validação de e-mail
-        if "participantes" in expresso_event and expresso_event["participantes"]:
-            google_event["attendees"] = []
-            for email in expresso_event["participantes"].split(","):
-                email = email.strip()
-                if self._validate_email(email):
-                    google_event["attendees"].append({"email": email})
-                else:
-                    print(f"E-mail inválido ignorado: {email}")
-
-        # Localização
-        if "localizacao" in expresso_event:
-            google_event["location"] = expresso_event["localizacao"]
-
-        # ID do evento original para referência
-        if "id" in expresso_event:
-            google_event["extendedProperties"] = {
-                "private": {"expresso_id": expresso_event["id"]}
-            }
-
-        return google_event
-
-    def _format_outlook_to_expresso(self, outlook_event):
-        """Converte um evento do Outlook para o formato do Expresso"""
-        if not outlook_event.get("subject") or not outlook_event.get("start"):
-            return None
-
-        # Extrair data e hora do evento
-        start_datetime = None
-        end_datetime = None
-        dia_inteiro = False
-
-        # Verificar se é um evento de dia inteiro
-        if "dateTime" not in outlook_event.get("start", {}):
-            # Evento de dia inteiro
-            dia_inteiro = True
-            inicio = "00:00"
-            fim = "23:59"
-
-            # Usar a data como está
-            data_formatada = outlook_event.get("start", {}).get("date", "")
-
-            # Converter para formato DD/MM/YYYY se necessário
-            if data_formatada and len(data_formatada) == 10:  # formato YYYY-MM-DD
-                dt = datetime.fromisoformat(data_formatada)
-                data_formatada = dt.strftime("%d/%m/%Y")
-        else:
-            # Evento com horário específico
-            start_datetime_str = outlook_event["start"]["dateTime"]
-            end_datetime_str = outlook_event["end"]["dateTime"]
-
-            # Converter para objetos datetime
-            start_dt = datetime.fromisoformat(start_datetime_str.replace("Z", "+00:00"))
-            end_dt = datetime.fromisoformat(end_datetime_str.replace("Z", "+00:00"))
-
-            # Formatar data e hora
-            data_formatada = start_dt.strftime("%d/%m/%Y")
-            inicio = start_dt.strftime("%H:%M")
-            fim = end_dt.strftime("%H:%M")
-            dia_inteiro = False
-
-        # Criar o evento no formato do Expresso
-        expresso_event = {
-            "titulo": outlook_event.get("subject", "Sem título"),
-            "descricao": outlook_event.get("body", {}).get(
-                "content", "Evento sincronizado do Outlook Calendar"
-            ),
-            "data": data_formatada,
-            "inicio": inicio,
-            "fim": fim,
-            "dia_inteiro": dia_inteiro,
-            "localizacao": outlook_event.get("location", {}).get("displayName", ""),
-        }
-
-        return expresso_event
-
-    def _normalize_event_for_comparison(self, event, source_type):
-        """Normaliza um evento para facilitar a comparação entre diferentes fontes"""
-        normalized = {}
-
-        # Extrair título normalizado
-        if source_type == "google":
-            normalized["title"] = event.get("summary", "").strip().lower()
-        elif source_type == "outlook":
-            normalized["title"] = event.get("subject", "").strip().lower()
-        elif source_type == "expresso":
-            normalized["title"] = event.get("titulo", "").strip().lower()
-
-        # Extrair e normalizar data/hora
-        if source_type == "google":
-            if "start" in event:
-                if "dateTime" in event["start"]:
-                    dt_str = event["start"]["dateTime"]
-                    try:
-                        dt = datetime.fromisoformat(dt_str.replace("Z", "+00:00"))
-                        normalized["date"] = dt.date().isoformat()
-                        normalized["time"] = dt.time().strftime("%H:%M")
-                    except:
-                        pass
-        elif source_type == "outlook":
-            if "start" in event:
-                if "dateTime" in event["start"]:
-                    dt_str = event["start"]["dateTime"]
-                    try:
-                        dt = datetime.fromisoformat(dt_str.replace("Z", "+00:00"))
-                        normalized["date"] = dt.date().isoformat()
-                        normalized["time"] = dt.time().strftime("%H:%M")
-                    except:
-                        pass
-        elif source_type == "expresso":
-            data = event.get("data", "")
-            hora = event.get("inicio", "")
-
-            if data and "/" in data:
-                try:
-                    dia, mes, ano = data.split("/")
-                    normalized["date"] = f"{ano}-{mes.zfill(2)}-{dia.zfill(2)}"
-                except:
-                    pass
-
-            if hora and ":" in hora:
-                normalized["time"] = hora
-
-        return normalized
-
-    def _validate_event_data(self, event_data, source_type):
-        required_fields = {
-            "google": ["summary", "start"],
-            "outlook": ["subject", "start"],
-            "expresso": ["titulo", "data", "inicio"],
-        }
-
-        for field in required_fields[source_type]:
-            if source_type == "google" or source_type == "outlook":
-                if field not in event_data:
-                    return False, f"Campo obrigatório ausente: {field}"
-                if field == "start" and "dateTime" not in event_data[field]:
-                    return False, f"Campo obrigatório ausente: {field}.dateTime"
-            else:
-                if field not in event_data:
-                    return False, f"Campo obrigatório ausente: {field}"
-
-        return True, ""
-
-    def _validate_and_normalize_attendees(self, attendees, target_type):
-        if not attendees:
-            return []
-
-        validated = []
-        for attendee in attendees:
-            email = None
-            if isinstance(attendee, dict) and "email" in attendee:
-                email = attendee["email"]
-            elif isinstance(attendee, str):
-                email = attendee.strip()
-
-            # Verificar se o e-mail é válido (formato simples)
-            if email and "@" in email and "." in email:
-                if target_type == "google":
-                    validated.append({"email": email})
-                elif target_type == "outlook":
-                    validated.append(
-                        {"emailAddress": {"address": email}, "type": "required"}
-                    )
-
-        return validated
-
-    def _remove_all_mappings(self, google_id=None, outlook_id=None, expresso_id=None):
-        """Remove todos os mapeamentos relacionados ao evento"""
-        # Obter todos os IDs mapeados
-        if google_id:
-            mapped_ids = self.db.get_mapped_ids(google_id, "google")
-            if mapped_ids:
-                outlook_id = mapped_ids[0] or outlook_id
-                expresso_id = mapped_ids[1] or expresso_id
-        elif outlook_id:
-            mapped_ids = self.db.get_mapped_ids(outlook_id, "outlook")
-            if mapped_ids:
-                google_id = mapped_ids[0] or google_id
-                expresso_id = mapped_ids[1] or expresso_id
-        elif expresso_id:
-            mapped_ids = self.db.get_mapped_ids(expresso_id, "expresso")
-            if mapped_ids:
-                outlook_id = mapped_ids[0] or outlook_id
-                google_id = mapped_ids[1] or google_id
-
-        # Remover do banco de dados
-        # Criar um método no DatabaseManager para remover mapeamentos
-        self.db.remove_mapping(
-            google_id=google_id, outlook_id=outlook_id, expresso_id=expresso_id
-        )
-
-        # Remover dos mapas em memória
-        if google_id and outlook_id:
-            if google_id in self.google_to_outlook_map:
-                del self.google_to_outlook_map[google_id]
-            if outlook_id in self.outlook_to_google_map:
-                del self.outlook_to_google_map[outlook_id]
-
-        if google_id and expresso_id:
-            if google_id in self.google_to_expresso_map:
-                del self.google_to_expresso_map[google_id]
-            if expresso_id in self.expresso_to_google_map:
-                del self.expresso_to_google_map[expresso_id]
-
-        if outlook_id and expresso_id:
-            if outlook_id in self.outlook_to_expresso_map:
-                del self.outlook_to_expresso_map[outlook_id]
-            if expresso_id in self.expresso_to_outlook_map:
-                del self.expresso_to_outlook_map[expresso_id]
+                print(f"  - Mesmo título mas data/hora muito diferente: {time_diff/3600:.2f} horas de diferença")
+                
+        # Se chegou aqui, nenhum evento correspondente foi encontrado
+        print("  - Nenhum evento correspondente encontrado")
+        return False, None
 
     def _find_matching_event_by_id(self, event_id, source_type, target_cache):
         """Tenta encontrar um evento correspondente usando IDs externos armazenados em campos personalizados"""
