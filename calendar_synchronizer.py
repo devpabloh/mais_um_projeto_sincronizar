@@ -1163,62 +1163,87 @@ class CalendarSynchronizer:
         # Ambos título e data/hora correspondem
         return True
 
-    def _format_google_to_expresso(self, google_event):
-        """Converte um evento do Google para o formato do Expresso"""
-        if not google_event.get("summary") or not google_event.get("start"):
-            return None
+    def _format_expresso_to_google(self, expresso_event):
+        """Converte um evento do Expresso para o formato do Google Calendar"""
+        google_event = {}
 
-        # Extrair data e hora do evento
-        start_datetime = None
-        end_datetime = None
-        dia_inteiro = False
+        # Título do evento
+        if "titulo" in expresso_event:
+            google_event["summary"] = expresso_event["titulo"]
 
-        # Verificar se é um evento de dia inteiro
-        if "date" in google_event.get("start", {}):
-            # Evento de dia inteiro
-            start_date = google_event["start"]["date"]
-            end_date = (
-                google_event["end"]["date"]
-                if "date" in google_event.get("end", {})
-                else start_date
-            )
+        # Descrição do evento
+        if "descricao" in expresso_event:
+            google_event["description"] = expresso_event["descricao"]
 
-            # Converter para formato DD/MM/YYYY
-            start_dt = datetime.fromisoformat(start_date)
-            data_formatada = start_dt.strftime("%d/%m/%Y")
+        # Data e hora
+        if "data" in expresso_event:
+            data_str = expresso_event["data"]
 
-            dia_inteiro = True
-            inicio = "00:00"
-            fim = "23:59"
-        else:
-            # Evento com horário específico
-            start_datetime_str = google_event["start"]["dateTime"]
-            end_datetime_str = google_event["end"]["dateTime"]
+            # Convertendo data do formato DD/MM/YYYY para YYYY-MM-DD
+            if "/" in data_str:
+                dia, mes, ano = data_str.split("/")
+                data_iso = f"{ano}-{mes.zfill(2)}-{dia.zfill(2)}"  # Garantir dois dígitos
+            else:
+                data_iso = data_str
 
-            # Converter para objetos datetime
-            start_dt = datetime.fromisoformat(start_datetime_str.replace("Z", "+00:00"))
-            end_dt = datetime.fromisoformat(end_datetime_str.replace("Z", "+00:00"))
+            if "inicio" in expresso_event:  # Mudança aqui: usando 'inicio' em vez de 'hora_inicio'
+                # Evento com horário específico
+                hora_inicio = expresso_event["inicio"]
+                if isinstance(hora_inicio, datetime):
+                    start_iso = hora_inicio.isoformat()
+                else:
+                    # Assumindo formato HH:MM
+                    hora, minuto = hora_inicio.split(":")
+                    start_iso = f"{data_iso}T{hora.zfill(2)}:{minuto.zfill(2)}:00"
 
-            # Formatar data e hora
-            data_formatada = start_dt.strftime("%d/%m/%Y")
-            inicio = start_dt.strftime("%H:%M")
-            fim = end_dt.strftime("%H:%M")
-            dia_inteiro = False
+                google_event["start"] = {
+                    "dateTime": start_iso,
+                    "timeZone": "America/Recife"
+                }
+            else:
+                # Evento de dia inteiro
+                google_event["start"] = {"date": data_iso}
 
-        # Criar o evento no formato do Expresso
-        expresso_event = {
-            "titulo": google_event.get("summary", "Sem título"),
-            "descricao": google_event.get(
-                "description", "Evento sincronizado do Google Calendar"
-            ),
-            "data": data_formatada,
-            "inicio": inicio,
-            "fim": fim,
-            "dia_inteiro": dia_inteiro,
-            "localizacao": google_event.get("location", ""),
-        }
+            # Hora de término
+            if "fim" in expresso_event:  # Mudança aqui: usando 'fim' em vez de 'hora_fim'
+                hora_fim = expresso_event["fim"]
+                if isinstance(hora_fim, datetime):
+                    end_iso = hora_fim.isoformat()
+                else:
+                    # Assumindo formato HH:MM
+                    hora, minuto = hora_fim.split(":")
+                    end_iso = f"{data_iso}T{hora.zfill(2)}:{minuto.zfill(2)}:00"
 
-        return expresso_event
+                google_event["end"] = {
+                    "dateTime": end_iso,
+                    "timeZone": "America/Recife"
+                }
+            elif "start" in google_event and "date" in google_event["start"]:
+                # Para eventos de dia inteiro, a data de término é o dia seguinte
+                end_date = (
+                    (datetime.fromisoformat(google_event["start"]["date"]) + timedelta(days=1))
+                    .date()
+                    .isoformat()
+                )
+                google_event["end"] = {"date": end_date}
+
+        # Participantes
+        if "participantes" in expresso_event and expresso_event["participantes"]:
+            google_event["attendees"] = []
+            for email in expresso_event["participantes"].split(","):
+                google_event["attendees"].append({"email": email.strip()})
+
+        # Localização
+        if "localizacao" in expresso_event:
+            google_event["location"] = expresso_event["localizacao"]
+
+        # ID do evento original para referência
+        if "id" in expresso_event:
+            google_event["extendedProperties"] = {
+                "private": {"expresso_id": expresso_event["id"]}
+            }
+
+        return google_event
 
     def _format_outlook_to_expresso(self, outlook_event):
         """Converte um evento do Outlook para o formato do Expresso"""
@@ -1364,78 +1389,6 @@ class CalendarSynchronizer:
                     )
 
         return validated
-
-    def _format_expresso_to_google(self, expresso_event):
-        """Converte um evento do Expresso para o formato do Google Calendar"""
-        if not expresso_event.get("titulo") or not expresso_event.get("data"):
-            return None
-
-        # Extrair data e criar objeto datetime
-        data_str = expresso_event.get("data", "")
-        inicio_str = expresso_event.get("inicio", "")
-        fim_str = expresso_event.get("fim", "")
-
-        # Extrair componentes da data (formato DD/MM/YYYY)
-        try:
-            if "/" in data_str:
-                dia, mes, ano = data_str.split("/")
-                data_iso = f"{ano}-{mes.zfill(2)}-{dia.zfill(2)}"
-            else:
-                data_iso = data_str
-
-            # Criar objeto do evento para o Google
-            google_event = {
-                "summary": expresso_event.get("titulo", "Sem título"),
-                "description": expresso_event.get(
-                    "descricao", "Evento sincronizado do Expresso"
-                ),
-                "location": expresso_event.get("localizacao", ""),
-            }
-
-            # Verificar se é evento de dia inteiro
-            if expresso_event.get("dia_inteiro", False):
-                google_event["start"] = {"date": data_iso}
-                # Para eventos de dia inteiro, a data de término é o dia seguinte
-                from datetime import datetime, timedelta
-
-                end_date = (
-                    (datetime.fromisoformat(data_iso) + timedelta(days=1))
-                    .date()
-                    .isoformat()
-                )
-                google_event["end"] = {"date": end_date}
-            else:
-                # Evento com horário específico
-                if inicio_str and ":" in inicio_str:
-                    hora, minuto = inicio_str.split(":")
-                    start_datetime = f"{data_iso}T{hora.zfill(2)}:{minuto.zfill(2)}:00"
-                    google_event["start"] = {
-                        "dateTime": start_datetime,
-                        "timeZone": "America/Recife",
-                    }
-
-                if fim_str and ":" in fim_str:
-                    hora, minuto = fim_str.split(":")
-                    end_datetime = f"{data_iso}T{hora.zfill(2)}:{minuto.zfill(2)}:00"
-                    google_event["end"] = {
-                        "dateTime": end_datetime,
-                        "timeZone": "America/Recife",
-                    }
-
-            # Tratar participantes - este é o ponto crítico do erro
-            participantes = expresso_event.get("participantes", "")
-            if participantes:
-                # Validar e normalizar os e-mails dos participantes
-                attendees = self._validate_and_normalize_attendees(
-                    participantes.split(","), "google"
-                )
-                if attendees:  # Só incluir se houver participantes válidos
-                    google_event["attendees"] = attendees
-
-            return google_event
-        except Exception as e:
-            print(f"Erro ao converter evento do Expresso para Google: {e}")
-            return None
 
     def _remove_all_mappings(self, google_id=None, outlook_id=None, expresso_id=None):
         """Remove todos os mapeamentos relacionados ao evento"""
