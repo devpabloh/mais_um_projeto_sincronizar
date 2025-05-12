@@ -2,6 +2,7 @@
 from database import DatabaseManager
 from datetime import datetime, timedelta
 import time
+import re
 
 # Adicione/modifique estas partes no arquivo calendar_synchronizer.py
 
@@ -1163,9 +1164,26 @@ class CalendarSynchronizer:
         # Ambos título e data/hora correspondem
         return True
 
-    def _format_expresso_to_google(self, expresso_event):
-        """Converte um evento do Expresso para o formato do Google Calendar"""
-        google_event = {}
+    def _validate_email(self, email):
+        """Valida se um e-mail está em formato válido"""
+        # Remover espaços em branco
+        email = email.strip()
+        
+        # Padrão básico de validação de e-mail
+        pattern = r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$'
+        
+        # Verificar se o e-mail corresponde ao padrão
+        if not re.match(pattern, email):
+            return False
+        
+        # Verificar se o domínio tem pelo menos um ponto
+        if '.' not in email.split('@')[1]:
+            return False
+        
+        return True
+
+    def Não foi possível encontrar elementos com class='event_entry'
+Erro geral ao obter eventos: Message: 
 
         # Título do evento
         if "titulo" in expresso_event:
@@ -1182,11 +1200,11 @@ class CalendarSynchronizer:
             # Convertendo data do formato DD/MM/YYYY para YYYY-MM-DD
             if "/" in data_str:
                 dia, mes, ano = data_str.split("/")
-                data_iso = f"{ano}-{mes.zfill(2)}-{dia.zfill(2)}"  # Garantir dois dígitos
+                data_iso = f"{ano}-{mes.zfill(2)}-{dia.zfill(2)}"
             else:
                 data_iso = data_str
 
-            if "inicio" in expresso_event:  # Mudança aqui: usando 'inicio' em vez de 'hora_inicio'
+            if "inicio" in expresso_event:
                 # Evento com horário específico
                 hora_inicio = expresso_event["inicio"]
                 if isinstance(hora_inicio, datetime):
@@ -1205,7 +1223,7 @@ class CalendarSynchronizer:
                 google_event["start"] = {"date": data_iso}
 
             # Hora de término
-            if "fim" in expresso_event:  # Mudança aqui: usando 'fim' em vez de 'hora_fim'
+            if "fim" in expresso_event:
                 hora_fim = expresso_event["fim"]
                 if isinstance(hora_fim, datetime):
                     end_iso = hora_fim.isoformat()
@@ -1227,11 +1245,15 @@ class CalendarSynchronizer:
                 )
                 google_event["end"] = {"date": end_date}
 
-        # Participantes
+        # Participantes - com validação de e-mail
         if "participantes" in expresso_event and expresso_event["participantes"]:
             google_event["attendees"] = []
             for email in expresso_event["participantes"].split(","):
-                google_event["attendees"].append({"email": email.strip()})
+                email = email.strip()
+                if self._validate_email(email):
+                    google_event["attendees"].append({"email": email})
+                else:
+                    print(f"E-mail inválido ignorado: {email}")
 
         # Localização
         if "localizacao" in expresso_event:
