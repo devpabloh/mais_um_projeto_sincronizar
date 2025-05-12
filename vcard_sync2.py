@@ -38,20 +38,46 @@ class sincronizarExpresso:
         self.driver = None
 
     def login(self):
-        self.driver = webdriver.Chrome(service=Service(ChromeDriverManager().install()))
-        self.driver.get("https://www.expresso.pe.gov.br/login.php?cd=1")
-        time.sleep(3)
-        inputlogin = self.driver.find_element(By.XPATH, "//input[@name='user']")
-        inputlogin.clear()
-        inputlogin.send_keys(self.username)
-        inputSenha = self.driver.find_element(By.XPATH, "//input[@type='password']")
-        inputSenha.clear()
-        inputSenha.send_keys(self.password)
-        botaoConectar = self.driver.find_element(
-            By.XPATH, "//div[@class='botao-conectar']//input[@type='submit']"
-        )
-        botaoConectar.click()
-        time.sleep(3)
+        try:
+            # Configurações do Chrome
+            chrome_options = webdriver.ChromeOptions()
+            chrome_options.add_argument('--no-sandbox')
+            chrome_options.add_argument('--disable-dev-shm-usage')
+            chrome_options.add_argument('--disable-gpu')
+            chrome_options.add_argument('--window-size=1920,1080')
+            
+            # Instalar o ChromeDriver usando WebDriver Manager
+            driver_path = ChromeDriverManager().install()
+            service = Service(driver_path)
+            
+            # Inicializar o driver com as opções
+            self.driver = webdriver.Chrome(service=service, options=chrome_options)
+            
+            # Configurar timeout
+            self.driver.set_page_load_timeout(60)
+            
+            # Acessar a página
+            self.driver.get("https://www.expresso.pe.gov.br/login.php?cd=1")
+            time.sleep(5)  # Esperar um pouco mais para a página carregar
+            
+            # Resto do código de login...
+            inputlogin = self.driver.find_element(By.XPATH, "//input[@name='user']")
+            inputlogin.clear()
+            inputlogin.send_keys(self.username)
+            inputSenha = self.driver.find_element(By.XPATH, "//input[@type='password']")
+            inputSenha.clear()
+            inputSenha.send_keys(self.password)
+            botaoConectar = self.driver.find_element(
+                By.XPATH, "//div[@class='botao-conectar']//input[@type='submit']"
+            )
+            botaoConectar.click()
+            time.sleep(5)
+            
+        except Exception as e:
+            print(f"Erro ao inicializar o Chrome: {e}")
+            if hasattr(self, 'driver') and self.driver:
+                self.driver.quit()
+            raise
 
     def selecionarCalendario(self):
         botaoCalendario = self.driver.find_element(
@@ -751,73 +777,71 @@ class sincronizarExpresso:
             # Convertendo data do formato DD/MM/YYYY para YYYY-MM-DD
             if "/" in data_str:
                 dia, mes, ano = data_str.split("/")
-                data_iso = f"{ano}-{mes}-{dia}"
+                # Garantir que os valores tenham dois dígitos
+                data_iso = f"{ano}-{mes.zfill(2)}-{dia.zfill(2)}"
+                print(f"Data convertida: {data_str} -> {data_iso}")  # Log para debug
             else:
                 data_iso = data_str
 
-            if "hora_inicio" in expresso_event:
-                # Evento com horário específico
-                if isinstance(expresso_event["hora_inicio"], datetime):
-                    hora_inicio = expresso_event["hora_inicio"]
-                    start_iso = hora_inicio.isoformat()
-                else:
-                    # Assumindo formato HH:MM ou objeto de hora
-                    hora, minuto = (
-                        expresso_event["hora_inicio"].split(":")
-                        if isinstance(expresso_event["hora_inicio"], str)
-                        else [0, 0]
-                    )
-                    start_iso = f"{data_iso}T{hora}:{minuto}:00"
-
-                google_event["start"] = {
-                    "dateTime": start_iso,
-                    "timeZone": "America/Recife",
-                }
-            else:
+            # Verificar se é evento de dia inteiro ou com horário específico
+            dia_inteiro = expresso_event.get("dia_inteiro", False)
+            
+            if dia_inteiro:
                 # Evento de dia inteiro
                 google_event["start"] = {"date": data_iso}
-
-        # Hora de término
-        if "data" in expresso_event and "hora_fim" in expresso_event:
-            data_str = expresso_event["data"]
-
-            # Convertendo data do formato DD/MM/YYYY para YYYY-MM-DD
-            if "/" in data_str:
-                dia, mes, ano = data_str.split("/")
-                data_iso = f"{ano}-{mes}-{dia}"
+                # A data de término deve ser o dia seguinte para eventos de dia inteiro
+                end_date = (datetime.fromisoformat(data_iso) + timedelta(days=1)).date().isoformat()
+                google_event["end"] = {"date": end_date}
             else:
-                data_iso = data_str
+                # Evento com horário específico
+                if "inicio" in expresso_event and expresso_event["inicio"]:
+                    hora_inicio = expresso_event["inicio"]
+                    if isinstance(hora_inicio, str) and ":" in hora_inicio:
+                        hora, minuto = hora_inicio.split(":")
+                        # Garantir que hora e minuto tenham dois dígitos
+                        start_iso = f"{data_iso}T{hora.zfill(2)}:{minuto.zfill(2)}:00"
+                        google_event["start"] = {
+                            "dateTime": start_iso,
+                            "timeZone": "America/Recife"
+                        }
+                    elif isinstance(hora_inicio, datetime):
+                        start_iso = hora_inicio.strftime("%Y-%m-%dT%H:%M:%S")
+                        google_event["start"] = {
+                            "dateTime": start_iso,
+                            "timeZone": "America/Recife"
+                        }
 
-            if isinstance(expresso_event["hora_fim"], datetime):
-                hora_fim = expresso_event["hora_fim"]
-                end_iso = hora_fim.isoformat()
-            else:
-                # Assumindo formato HH:MM ou objeto de hora
-                hora, minuto = (
-                    expresso_event["hora_fim"].split(":")
-                    if isinstance(expresso_event["hora_fim"], str)
-                    else [23, 59]
-                )
-                end_iso = f"{data_iso}T{hora}:{minuto}:00"
+                # Hora de término
+                if "fim" in expresso_event and expresso_event["fim"]:
+                    hora_fim = expresso_event["fim"]
+                    if isinstance(hora_fim, str) and ":" in hora_fim:
+                        hora, minuto = hora_fim.split(":")
+                        # Garantir que hora e minuto tenham dois dígitos
+                        end_iso = f"{data_iso}T{hora.zfill(2)}:{minuto.zfill(2)}:00"
+                        google_event["end"] = {
+                            "dateTime": end_iso,
+                            "timeZone": "America/Recife"
+                        }
+                    elif isinstance(hora_fim, datetime):
+                        end_iso = hora_fim.strftime("%Y-%m-%dT%H:%M:%S")
+                        google_event["end"] = {
+                            "dateTime": end_iso,
+                            "timeZone": "America/Recife"
+                        }
 
-            google_event["end"] = {"dateTime": end_iso, "timeZone": "America/Recife"}
-        elif "start" in google_event and "date" in google_event["start"]:
-            # Para eventos de dia inteiro, a data de término é o dia seguinte
-            end_date = (
-                (
-                    datetime.fromisoformat(google_event["start"]["date"])
-                    + timedelta(days=1)
-                )
-                .date()
-                .isoformat()
-            )
-            google_event["end"] = {"date": end_date}
-
-        # Participantes
+        # Participantes com validação de e-mail
         if "participantes" in expresso_event and expresso_event["participantes"]:
-            google_event["attendees"] = []
+            valid_attendees = []
             for email in expresso_event["participantes"].split(","):
-                google_event["attendees"].append({"email": email.strip()})
+                email = email.strip()
+                # Validação básica de e-mail
+                if "@" in email and "." in email.split("@")[1]:
+                    valid_attendees.append({"email": email})
+                else:
+                    print(f"E-mail inválido ignorado: {email}")
+            
+            if valid_attendees:
+                google_event["attendees"] = valid_attendees
 
         # Localização
         if "localizacao" in expresso_event:
@@ -825,9 +849,9 @@ class sincronizarExpresso:
 
         # ID do evento original para referência
         if "id" in expresso_event:
-            google_event["extendedProperties"] = {
-                "private": {"expresso_id": expresso_event["id"]}
-            }
+            if "extendedProperties" not in google_event:
+                google_event["extendedProperties"] = {"private": {}}
+            google_event["extendedProperties"]["private"]["expresso_id"] = expresso_event["id"]
 
         return google_event
 
@@ -987,6 +1011,33 @@ class sincronizarExpresso:
                 return True, target_id
 
         return False, None
+
+    def _is_expresso_event_updated(self, current_event, cached_event):
+        """Verifica se um evento do Expresso foi atualizado"""
+        # Campos importantes
+        fields = ['titulo', 'descricao', 'data', 'inicio', 'fim', 'localizacao']
+        
+        for field in fields:
+            if field in current_event and field in cached_event:
+                if current_event[field] != cached_event[field]:
+                    return True
+        
+        return False
+
+    def sync_changes_only(self):
+        print("\n=== INICIANDO SINCRONIZAÇÃO ===")
+        print(f"Data/Hora atual: {datetime.now().strftime('%d/%m/%Y %H:%M:%S')}")
+        print(f"Última sincronização: {self.last_sync_time.strftime('%d/%m/%Y %H:%M:%S')}")
+
+        if hasattr(self, "expresso_sync") and self.expresso_sync:
+            print("\n=== VERIFICANDO EXPRESSO ===")
+            try:
+                expresso_events = self.expresso_sync.obterEventos()
+                print(f"Eventos obtidos do Expresso: {len(expresso_events)}")
+                for event in expresso_events[:5]:  # Mostrar primeiros 5 eventos
+                    print(f"  - {event.get('titulo', 'Sem título')} ({event.get('data', 'sem data')})")
+            except Exception as e:
+                print(f"ERRO ao obter eventos do Expresso: {e}")
 
 
 # Exemplo de uso

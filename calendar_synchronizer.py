@@ -1182,8 +1182,9 @@ class CalendarSynchronizer:
         
         return True
 
-    def Não foi possível encontrar elementos com class='event_entry'
-Erro geral ao obter eventos: Message: 
+    def _format_expresso_to_google(self, expresso_event):
+        """Converte um evento do Expresso para o formato do Google Calendar"""
+        google_event = {}
 
         # Título do evento
         if "titulo" in expresso_event:
@@ -1200,11 +1201,11 @@ Erro geral ao obter eventos: Message:
             # Convertendo data do formato DD/MM/YYYY para YYYY-MM-DD
             if "/" in data_str:
                 dia, mes, ano = data_str.split("/")
-                data_iso = f"{ano}-{mes.zfill(2)}-{dia.zfill(2)}"
+                data_iso = f"{ano}-{mes.zfill(2)}-{dia.zfill(2)}"  # Garantir dois dígitos
             else:
                 data_iso = data_str
 
-            if "inicio" in expresso_event:
+            if "inicio" in expresso_event:  # Mudança aqui: usando 'inicio' em vez de 'hora_inicio'
                 # Evento com horário específico
                 hora_inicio = expresso_event["inicio"]
                 if isinstance(hora_inicio, datetime):
@@ -1223,7 +1224,7 @@ Erro geral ao obter eventos: Message:
                 google_event["start"] = {"date": data_iso}
 
             # Hora de término
-            if "fim" in expresso_event:
+            if "fim" in expresso_event:  # Mudança aqui: usando 'fim' em vez de 'hora_fim'
                 hora_fim = expresso_event["fim"]
                 if isinstance(hora_fim, datetime):
                     end_iso = hora_fim.isoformat()
