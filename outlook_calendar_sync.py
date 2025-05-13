@@ -187,6 +187,62 @@ class OutlookCalendarSync:
             "Authorization": f"Bearer {self.token}",
             "Content-Type": "application/json",
         }
+
+        # Garantir a formatação correta para eventos de dia inteiro antes de enviar
+        if event.get("isAllDay"):
+            # Start time deve ser meia-noite UTC
+            if "start" in event and "dateTime" in event["start"]:
+                try:
+                    start_date_str = event["start"]["dateTime"].split("T")[0]
+                    event["start"]["dateTime"] = f"{start_date_str}T00:00:00"
+                    event["start"]["timeZone"] = "UTC"
+                except Exception as e:
+                    print(f"Erro ao processar start dateTime para evento all-day: {e}")
+                    # Pode ser necessário um tratamento de erro mais robusto aqui
+
+            # End time deve ser meia-noite UTC do dia seguinte
+            if "end" in event and "dateTime" in event["end"]:
+                try:
+                    # Tenta obter a data de início para calcular o fim corretamente
+                    current_start_date_str = ""
+                    if "start" in event and "dateTime" in event["start"]:
+                         current_start_date_str = event["start"]["dateTime"].split("T")[0]
+
+                    if current_start_date_str:
+                         start_dt_obj = datetime.fromisoformat(current_start_date_str)
+                         # O fim de um evento de dia inteiro no Outlook é a meia-noite do dia em que termina,
+                         # que é efetivamente o início do dia seguinte ao start para um evento de um dia.
+                         # Se o evento do Google/Expresso já tem um 'end.date', usamos ele,
+                         # caso contrário, calculamos como start + 1 dia.
+                         
+                         # Verifica se o 'end.dateTime' original já representa o dia correto
+                         original_end_date_str = event["end"]["dateTime"].split("T")[0]
+                         original_end_dt_obj = datetime.fromisoformat(original_end_date_str)
+
+                         # Se o 'end date' original não for pelo menos um dia depois do 'start date', ajusta.
+                         # Para um evento de um único dia inteiro, o 'end.date' do Google é o dia seguinte.
+                         # Outlook espera que o 'end.dateTime' para um evento de dia inteiro seja 00:00 do dia seguinte ao término visual.
+                         # Ex: Evento de dia inteiro em 2023-10-10.
+                         # Google: start.date=2023-10-10, end.date=2023-10-11
+                         # Outlook: start.dateTime=2023-10-10T00:00:00Z, end.dateTime=2023-10-11T00:00:00Z
+
+                        # Usa a data de término já formatada se ela for posterior à data de início
+                         if original_end_dt_obj > start_dt_obj:
+                            event["end"]["dateTime"] = f"{original_end_date_str}T00:00:00"
+                         else: # Garante que o fim seja no mínimo o dia seguinte ao início
+                            end_dt_obj = start_dt_obj + timedelta(days=1)
+                            event["end"]["dateTime"] = f"{end_dt_obj.strftime('%Y-%m-%d')}T00:00:00"
+                         event["end"]["timeZone"] = "UTC"
+                    else:
+                        # Fallback se a data de início não puder ser determinada
+                         end_date_str = event["end"]["dateTime"].split("T")[0]
+                         event["end"]["dateTime"] = f"{end_date_str}T00:00:00" # Poderia ser impreciso
+                         event["end"]["timeZone"] = "UTC"
+
+                except Exception as e:
+                    print(f"Erro ao processar end dateTime para evento all-day: {e}")
+
+        print(f"Outlook Update Payload: {json.dumps(event, indent=2)}") # Log para depuração
         response = requests.patch(url, headers=headers, data=json.dumps(event))
         if response.status_code in (200, 201, 204):
             return response.json() if response.text else {}
