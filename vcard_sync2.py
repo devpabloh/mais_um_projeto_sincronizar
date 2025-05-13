@@ -1054,10 +1054,10 @@ class sincronizarExpresso:
                     del self.outlook_to_google_map[outlook_id_mapped]
             
             # Se existe mapeamento Google -> Expresso
-            if google_id in self.google_to_expresso_map:
+            if hasattr(self, 'google_to_expresso_map') and google_id in self.google_to_expresso_map:
                 expresso_id_mapped = self.google_to_expresso_map[google_id]
                 del self.google_to_expresso_map[google_id]
-                if expresso_id_mapped in self.expresso_to_google_map:
+                if hasattr(self, 'expresso_to_google_map') and expresso_id_mapped in self.expresso_to_google_map:
                     del self.expresso_to_google_map[expresso_id_mapped]
         
         if outlook_id:
@@ -1069,25 +1069,25 @@ class sincronizarExpresso:
                     del self.google_to_outlook_map[google_id_mapped]
             
             # Se existe mapeamento Outlook -> Expresso
-            if outlook_id in self.outlook_to_expresso_map:
+            if hasattr(self, 'outlook_to_expresso_map') and outlook_id in self.outlook_to_expresso_map:
                 expresso_id_mapped = self.outlook_to_expresso_map[outlook_id]
                 del self.outlook_to_expresso_map[outlook_id]
-                if expresso_id_mapped in self.expresso_to_outlook_map:
+                if hasattr(self, 'expresso_to_outlook_map') and expresso_id_mapped in self.expresso_to_outlook_map:
                     del self.expresso_to_outlook_map[expresso_id_mapped]
         
         if expresso_id:
             # Se existe mapeamento Expresso -> Google
-            if expresso_id in self.expresso_to_google_map:
+            if hasattr(self, 'expresso_to_google_map') and expresso_id in self.expresso_to_google_map:
                 google_id_mapped = self.expresso_to_google_map[expresso_id]
                 del self.expresso_to_google_map[expresso_id]
-                if google_id_mapped in self.google_to_expresso_map:
+                if hasattr(self, 'google_to_expresso_map') and google_id_mapped in self.google_to_expresso_map:
                     del self.google_to_expresso_map[google_id_mapped]
             
             # Se existe mapeamento Expresso -> Outlook
-            if expresso_id in self.expresso_to_outlook_map:
+            if hasattr(self, 'expresso_to_outlook_map') and expresso_id in self.expresso_to_outlook_map:
                 outlook_id_mapped = self.expresso_to_outlook_map[expresso_id]
                 del self.expresso_to_outlook_map[expresso_id]
-                if outlook_id_mapped in self.outlook_to_expresso_map:
+                if hasattr(self, 'outlook_to_expresso_map') and outlook_id_mapped in self.outlook_to_expresso_map:
                     del self.outlook_to_expresso_map[outlook_id_mapped]
 
 

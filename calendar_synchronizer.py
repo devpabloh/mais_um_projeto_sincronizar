@@ -1001,16 +1001,44 @@ class CalendarSynchronizer:
                 "content": google_event.get(
                     "description", "Evento sincronizado do Google Calendar"
                 ),
-            },
-            "start": {
+            }
+        }
+
+        # Verificar se é um evento de dia inteiro (verificando se existe a chave 'date' em vez de 'dateTime')
+        if "date" in google_event.get("start", {}):
+            # Evento de dia inteiro
+            data_inicio = google_event.get("start", {}).get("date", "")
+            data_fim = google_event.get("end", {}).get("date", "")
+            
+            # Para eventos de dia inteiro no Outlook, é necessário configurar:
+            # 1. A propriedade isAllDay como true
+            # 2. O horário de início como meia-noite (00:00:00)
+            # 3. O horário de término como meia-noite do dia seguinte (00:00:00)
+            outlook_event["isAllDay"] = True
+            outlook_event["start"] = {
+                "dateTime": f"{data_inicio}T00:00:00",
+                "timeZone": "UTC"
+            }
+            
+            # Se não tiver data de fim, usar a data de início + 1 dia
+            if not data_fim:
+                data_obj = datetime.fromisoformat(data_inicio)
+                data_fim = (data_obj + timedelta(days=1)).date().isoformat()
+            
+            outlook_event["end"] = {
+                "dateTime": f"{data_fim}T00:00:00",
+                "timeZone": "UTC"
+            }
+        else:
+            # Evento com horário específico
+            outlook_event["start"] = {
                 "dateTime": google_event.get("start", {}).get("dateTime", ""),
                 "timeZone": google_event.get("start", {}).get("timeZone", "UTC"),
-            },
-            "end": {
+            }
+            outlook_event["end"] = {
                 "dateTime": google_event.get("end", {}).get("dateTime", ""),
                 "timeZone": google_event.get("end", {}).get("timeZone", "UTC"),
-            },
-        }
+            }
 
         if google_event.get("location"):
             outlook_event["location"] = {"displayName": google_event.get("location")}
@@ -1027,15 +1055,32 @@ class CalendarSynchronizer:
             "description": outlook_event.get("body", {}).get(
                 "content", "Evento sincronizado do Outlook Calendar"
             ),
-            "start": {
+        }
+
+        # Verificar se é um evento de dia inteiro
+        if outlook_event.get("isAllDay", False) == True:
+            # Evento de dia inteiro
+            start_date = outlook_event.get("start", {}).get("dateTime", "")
+            if start_date:
+                # Extrair apenas a data (YYYY-MM-DD)
+                date_only = start_date.split("T")[0]
+                google_event["start"] = {"date": date_only}
+                
+                # Para o término, usamos a data seguinte para eventos de dia inteiro no Google
+                end_date = outlook_event.get("end", {}).get("dateTime", "")
+                if end_date:
+                    end_date_only = end_date.split("T")[0]
+                    google_event["end"] = {"date": end_date_only}
+        else:
+            # Evento com horário específico
+            google_event["start"] = {
                 "dateTime": outlook_event.get("start", {}).get("dateTime", ""),
                 "timeZone": outlook_event.get("start", {}).get("timeZone", "UTC"),
-            },
-            "end": {
+            }
+            google_event["end"] = {
                 "dateTime": outlook_event.get("end", {}).get("dateTime", ""),
                 "timeZone": outlook_event.get("end", {}).get("timeZone", "UTC"),
-            },
-        }
+            }
 
         if outlook_event.get("location"):
             google_event["location"] = outlook_event.get("location", {}).get(
@@ -1190,8 +1235,7 @@ class CalendarSynchronizer:
                     if data and hora and ':' in hora:
                         dia, mes, ano = data.split('/')
                         hora, minuto = hora.split(':')
-                        # Criar um datetime aware com timezone UTC
-                        event_datetime = datetime(int(ano), int(mes), int(dia), int(hora), int(minuto), tzinfo=timezone.utc)
+                        event_datetime = datetime(int(ano), int(mes), int(dia), int(hora), int(minuto))
                         print(f"  - Data/hora do evento: {event_datetime}")
         except (ValueError, TypeError, IndexError) as e:
             print(f"  - Erro ao extrair data/hora: {e}")
@@ -1260,8 +1304,7 @@ class CalendarSynchronizer:
                         if data and hora and ':' in hora:
                             dia, mes, ano = data.split('/')
                             hora, minuto = hora.split(':')
-                            # Criar um datetime aware com timezone UTC
-                            target_datetime = datetime(int(ano), int(mes), int(dia), int(hora), int(minuto), tzinfo=timezone.utc)
+                            target_datetime = datetime(int(ano), int(mes), int(dia), int(hora), int(minuto))
                             print(f"  - Data/hora do evento destino: {target_datetime}")
             except (ValueError, TypeError, IndexError) as e:
                 print(f"  - Erro ao extrair data/hora do evento de destino: {e}")
@@ -1273,17 +1316,14 @@ class CalendarSynchronizer:
             if not target_datetime:
                 print(f"  - Match apenas por título (destino sem data): '{event_title}'")
                 return True, target_id
-                
-            # Verificar se ambos os datetimes são do mesmo tipo (aware ou naive)
-            # Se um for aware e outro naive, converter para que sejam comparáveis
-            if (event_datetime.tzinfo is None and target_datetime.tzinfo is not None):
-                # event_datetime é naive e target_datetime é aware
-                # Converter event_datetime para aware (UTC)
-                event_datetime = event_datetime.replace(tzinfo=timezone.utc)
-            elif (event_datetime.tzinfo is not None and target_datetime.tzinfo is None):
-                # event_datetime é aware e target_datetime é naive
-                # Converter target_datetime para aware (UTC)
-                target_datetime = target_datetime.replace(tzinfo=timezone.utc)
+            
+            # Garantir que ambos os datetimes são do mesmo tipo (naive ou aware)
+            # Opção 1: Tornar ambos naive (remover timezone)
+            if event_datetime and target_datetime:
+                if event_datetime.tzinfo is not None:
+                    event_datetime = event_datetime.replace(tzinfo=None)
+                if target_datetime.tzinfo is not None:
+                    target_datetime = target_datetime.replace(tzinfo=None)
                 
             # Comparar as datas/horas com tolerância de 24 horas (86400 segundos)
             try:
@@ -1329,3 +1369,119 @@ class CalendarSynchronizer:
                         return google_id
         
         return None
+
+    def _format_expresso_to_outlook(self, expresso_event):
+        """Converte um evento do Expresso para o formato do Outlook"""
+        outlook_event = {}
+
+        # Título do evento
+        if "titulo" in expresso_event:
+            outlook_event["subject"] = expresso_event["titulo"]
+
+        # Descrição do evento
+        if "descricao" in expresso_event:
+            outlook_event["body"] = {
+                "contentType": "text",
+                "content": expresso_event["descricao"],
+            }
+
+        # Data e hora
+        if "data" in expresso_event:
+            data_str = expresso_event["data"]
+
+            # Convertendo data do formato DD/MM/YYYY para YYYY-MM-DD
+            if "/" in data_str:
+                dia, mes, ano = data_str.split("/")
+                data_iso = f"{ano}-{mes.zfill(2)}-{dia.zfill(2)}"
+            else:
+                data_iso = data_str
+
+            # Verificar se é um evento de dia inteiro
+            dia_inteiro = expresso_event.get("dia_inteiro", False) or "hora_inicio" not in expresso_event
+
+            if dia_inteiro:
+                # Evento de dia inteiro
+                outlook_event["isAllDay"] = True
+                outlook_event["start"] = {
+                    "dateTime": f"{data_iso}T00:00:00",
+                    "timeZone": "UTC"  # Usar UTC para consistência
+                }
+                
+                # A data de término deve ser o dia seguinte às 00:00 para eventos de dia inteiro
+                data_obj = datetime.fromisoformat(data_iso)
+                data_seguinte = data_obj + timedelta(days=1)
+                data_iso_seguinte = data_seguinte.strftime("%Y-%m-%d")
+                
+                outlook_event["end"] = {
+                    "dateTime": f"{data_iso_seguinte}T00:00:00",
+                    "timeZone": "UTC"  # Usar UTC para consistência
+                }
+            else:
+                # Evento com horário específico
+                if isinstance(expresso_event["hora_inicio"], datetime):
+                    hora_inicio = expresso_event["hora_inicio"]
+                    start_iso = hora_inicio.isoformat()
+                else:
+                    # Assumindo formato HH:MM ou objeto de hora
+                    hora, minuto = (
+                        expresso_event["hora_inicio"].split(":")
+                        if isinstance(expresso_event["hora_inicio"], str)
+                        else [0, 0]
+                    )
+                    start_iso = f"{data_iso}T{hora.zfill(2)}:{minuto.zfill(2)}:00"
+
+                outlook_event["start"] = {
+                    "dateTime": start_iso,
+                    "timeZone": "America/Recife",
+                }
+                
+                # Hora de término
+                if "hora_fim" in expresso_event:
+                    if isinstance(expresso_event["hora_fim"], datetime):
+                        hora_fim = expresso_event["hora_fim"]
+                        end_iso = hora_fim.isoformat()
+                    else:
+                        # Assumindo formato HH:MM ou objeto de hora
+                        hora, minuto = (
+                            expresso_event["hora_fim"].split(":")
+                            if isinstance(expresso_event["hora_fim"], str)
+                            else [23, 59]
+                        )
+                        end_iso = f"{data_iso}T{hora.zfill(2)}:{minuto.zfill(2)}:00"
+
+                    outlook_event["end"] = {"dateTime": end_iso, "timeZone": "America/Recife"}
+                else:
+                    # Se não tiver hora de fim, usar hora de início + 1 hora
+                    if isinstance(expresso_event["hora_inicio"], datetime):
+                        hora_fim = expresso_event["hora_inicio"] + timedelta(hours=1)
+                        end_iso = hora_fim.isoformat()
+                    else:
+                        hora, minuto = (
+                            expresso_event["hora_inicio"].split(":")
+                            if isinstance(expresso_event["hora_inicio"], str)
+                            else [0, 0]
+                        )
+                        hora_int = int(hora) + 1
+                        end_iso = f"{data_iso}T{str(hora_int).zfill(2)}:{minuto}:00"
+                    
+                    outlook_event["end"] = {"dateTime": end_iso, "timeZone": "America/Recife"}
+
+        # Participantes
+        if "participantes" in expresso_event and expresso_event["participantes"]:
+            outlook_event["attendees"] = []
+            for email in expresso_event["participantes"].split(","):
+                outlook_event["attendees"].append(
+                    {
+                        "emailAddress": {
+                            "address": email.strip(),
+                            "name": email.strip(),
+                        },
+                        "type": "required",
+                    }
+                )
+
+        # Localização
+        if "localizacao" in expresso_event:
+            outlook_event["location"] = {"displayName": expresso_event["localizacao"]}
+
+        return outlook_event
