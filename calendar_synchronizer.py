@@ -1190,7 +1190,8 @@ class CalendarSynchronizer:
                     if data and hora and ':' in hora:
                         dia, mes, ano = data.split('/')
                         hora, minuto = hora.split(':')
-                        event_datetime = datetime(int(ano), int(mes), int(dia), int(hora), int(minuto))
+                        # Criar um datetime aware com timezone UTC
+                        event_datetime = datetime(int(ano), int(mes), int(dia), int(hora), int(minuto), tzinfo=timezone.utc)
                         print(f"  - Data/hora do evento: {event_datetime}")
         except (ValueError, TypeError, IndexError) as e:
             print(f"  - Erro ao extrair data/hora: {e}")
@@ -1259,7 +1260,8 @@ class CalendarSynchronizer:
                         if data and hora and ':' in hora:
                             dia, mes, ano = data.split('/')
                             hora, minuto = hora.split(':')
-                            target_datetime = datetime(int(ano), int(mes), int(dia), int(hora), int(minuto))
+                            # Criar um datetime aware com timezone UTC
+                            target_datetime = datetime(int(ano), int(mes), int(dia), int(hora), int(minuto), tzinfo=timezone.utc)
                             print(f"  - Data/hora do evento destino: {target_datetime}")
             except (ValueError, TypeError, IndexError) as e:
                 print(f"  - Erro ao extrair data/hora do evento de destino: {e}")
@@ -1272,16 +1274,30 @@ class CalendarSynchronizer:
                 print(f"  - Match apenas por título (destino sem data): '{event_title}'")
                 return True, target_id
                 
-            # Comparar as datas/horas com tolerância de 24 horas (86400 segundos)
-            # Usar tolerância maior para evitar duplicações devido a diferenças de fuso horário
-            time_diff = abs((event_datetime - target_datetime).total_seconds())
-            if time_diff <= 86400:  # 24 horas
-                print(f"  - Match completo (título e data) para evento: '{event_title}' em {event_datetime}")
-                print(f"  - Diferença de tempo: {time_diff} segundos ({time_diff/3600:.2f} horas)")
-                return True, target_id
-            else:
-                print(f"  - Mesmo título mas data/hora muito diferente: {time_diff/3600:.2f} horas de diferença")
+            # Verificar se ambos os datetimes são do mesmo tipo (aware ou naive)
+            # Se um for aware e outro naive, converter para que sejam comparáveis
+            if (event_datetime.tzinfo is None and target_datetime.tzinfo is not None):
+                # event_datetime é naive e target_datetime é aware
+                # Converter event_datetime para aware (UTC)
+                event_datetime = event_datetime.replace(tzinfo=timezone.utc)
+            elif (event_datetime.tzinfo is not None and target_datetime.tzinfo is None):
+                # event_datetime é aware e target_datetime é naive
+                # Converter target_datetime para aware (UTC)
+                target_datetime = target_datetime.replace(tzinfo=timezone.utc)
                 
+            # Comparar as datas/horas com tolerância de 24 horas (86400 segundos)
+            try:
+                time_diff = abs((event_datetime - target_datetime).total_seconds())
+                if time_diff <= 86400:  # 24 horas
+                    print(f"  - Match completo (título e data) para evento: '{event_title}' em {event_datetime}")
+                    print(f"  - Diferença de tempo: {time_diff} segundos ({time_diff/3600:.2f} horas)")
+                    return True, target_id
+                else:
+                    print(f"  - Mesmo título mas data/hora muito diferente: {time_diff/3600:.2f} horas de diferença")
+            except TypeError as e:
+                print(f"  - Erro ao comparar datas: {e}. Assumindo match pelo título.")
+                return True, target_id
+            
         # Se chegou aqui, nenhum evento correspondente foi encontrado
         print("  - Nenhum evento correspondente encontrado")
         return False, None
