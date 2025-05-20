@@ -590,3 +590,40 @@ class DatabaseManager:
             self.conn.rollback()
             print(f"Erro ao remover mapeamento: {e}")
             return 0
+
+    def remove_mappings(self, google_id=None, outlook_id=None, expresso_id=None):
+        """
+        Remove mapeamentos de eventos do banco de dados
+        
+        Args:
+            google_id: ID do evento no Google
+            outlook_id: ID do evento no Outlook
+            expresso_id: ID do evento no Expresso
+        """
+        try:
+            conditions = []
+            params = []
+            
+            if google_id:
+                conditions.append("google_event_id = ?")
+                params.append(google_id)
+            if outlook_id:
+                conditions.append("outlook_event_id = ?")
+                params.append(outlook_id)
+            if expresso_id:
+                conditions.append("expresso_event_id = ?")
+                params.append(expresso_id)
+            
+            if not conditions:
+                print("Nenhum ID fornecido para remover mapeamentos")
+                return
+            
+            where_clause = " OR ".join(conditions)
+            
+            self.conn.cursor().execute(
+                f"DELETE FROM eventos_sincronizados WHERE {where_clause}", params
+            )
+            self.conn.commit()
+            print(f"Mapeamentos removidos do banco de dados: {self.conn.cursor().rowcount} registros")
+        except Exception as e:
+            print(f"Erro ao remover mapeamentos do banco de dados: {e}")

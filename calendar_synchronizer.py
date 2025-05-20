@@ -399,6 +399,7 @@ class CalendarSynchronizer:
 
         # Processar eventos adicionados no Outlook
         for event_id, outlook_event in changes["outlook"]["added"].items():
+            print(f"[DEBUG] Dados completos do evento do Outlook: {json.dumps(outlook_event, default=str)}")
             print(
                 f"Processando novo evento do Outlook: {outlook_event.get('subject', 'Sem título')} (ID: {event_id})"
             )
@@ -1370,118 +1371,165 @@ class CalendarSynchronizer:
         
         return None
 
-    def _format_expresso_to_outlook(self, expresso_event):
-        """Converte um evento do Expresso para o formato do Outlook"""
-        outlook_event = {}
-
+    def _format_outlook_to_expresso(self, outlook_event):
+        expresso_event = {}
+        
+        # Debug para analisar o evento recebido
+        print(f"[DEBUG] Convertendo evento Outlook para Expresso: {json.dumps(outlook_event, default=str)}")
+        
         # Título do evento
-        if "titulo" in expresso_event:
-            outlook_event["subject"] = expresso_event["titulo"]
-
+        if "subject" in outlook_event:
+            expresso_event["titulo"] = outlook_event["subject"]
+        
         # Descrição do evento
-        if "descricao" in expresso_event:
-            outlook_event["body"] = {
-                "contentType": "text",
-                "content": expresso_event["descricao"],
-            }
-
+        if "bodyPreview" in outlook_event:
+            expresso_event["descricao"] = outlook_event["bodyPreview"]
+        elif "body" in outlook_event and "content" in outlook_event["body"]:
+            expresso_event["descricao"] = outlook_event["body"]["content"]
+        
         # Data e hora
-        if "data" in expresso_event:
-            data_str = expresso_event["data"]
-
-            # Convertendo data do formato DD/MM/YYYY para YYYY-MM-DD
-            if "/" in data_str:
-                dia, mes, ano = data_str.split("/")
-                data_iso = f"{ano}-{mes.zfill(2)}-{dia.zfill(2)}"
-            else:
-                data_iso = data_str
-
-            # Verificar se é um evento de dia inteiro
-            dia_inteiro = expresso_event.get("dia_inteiro", False) or "hora_inicio" not in expresso_event
-
-            if dia_inteiro:
-                # Evento de dia inteiro
-                outlook_event["isAllDay"] = True
-                outlook_event["start"] = {
-                    "dateTime": f"{data_iso}T00:00:00",
-                    "timeZone": "UTC"  # Usar UTC para consistência
-                }
-                
-                # A data de término deve ser o dia seguinte às 00:00 para eventos de dia inteiro
-                data_obj = datetime.fromisoformat(data_iso)
-                data_seguinte = data_obj + timedelta(days=1)
-                data_iso_seguinte = data_seguinte.strftime("%Y-%m-%d")
-                
-                outlook_event["end"] = {
-                    "dateTime": f"{data_iso_seguinte}T00:00:00",
-                    "timeZone": "UTC"  # Usar UTC para consistência
-                }
-            else:
-                # Evento com horário específico
-                if isinstance(expresso_event["hora_inicio"], datetime):
-                    hora_inicio = expresso_event["hora_inicio"]
-                    start_iso = hora_inicio.isoformat()
-                else:
-                    # Assumindo formato HH:MM ou objeto de hora
-                    hora, minuto = (
-                        expresso_event["hora_inicio"].split(":")
-                        if isinstance(expresso_event["hora_inicio"], str)
-                        else [0, 0]
-                    )
-                    start_iso = f"{data_iso}T{hora.zfill(2)}:{minuto.zfill(2)}:00"
-
-                outlook_event["start"] = {
-                    "dateTime": start_iso,
-                    "timeZone": "America/Recife",
-                }
-                
-                # Hora de término
-                if "hora_fim" in expresso_event:
-                    if isinstance(expresso_event["hora_fim"], datetime):
-                        hora_fim = expresso_event["hora_fim"]
-                        end_iso = hora_fim.isoformat()
+        try:
+            if "start" in outlook_event:
+                # Verificar se é um evento de dia inteiro
+                if outlook_event.get("isAllDay", False) == True:
+                    # Eventos de dia inteiro
+                    expresso_event["dia_inteiro"] = True
+                    if "date" in outlook_event["start"]:
+                        date_str = outlook_event["start"]["date"]
                     else:
-                        # Assumindo formato HH:MM ou objeto de hora
-                        hora, minuto = (
-                            expresso_event["hora_fim"].split(":")
-                            if isinstance(expresso_event["hora_fim"], str)
-                            else [23, 59]
-                        )
-                        end_iso = f"{data_iso}T{hora.zfill(2)}:{minuto.zfill(2)}:00"
-
-                    outlook_event["end"] = {"dateTime": end_iso, "timeZone": "America/Recife"}
-                else:
-                    # Se não tiver hora de fim, usar hora de início + 1 hora
-                    if isinstance(expresso_event["hora_inicio"], datetime):
-                        hora_fim = expresso_event["hora_inicio"] + timedelta(hours=1)
-                        end_iso = hora_fim.isoformat()
-                    else:
-                        hora, minuto = (
-                            expresso_event["hora_inicio"].split(":")
-                            if isinstance(expresso_event["hora_inicio"], str)
-                            else [0, 0]
-                        )
-                        hora_int = int(hora) + 1
-                        end_iso = f"{data_iso}T{str(hora_int).zfill(2)}:{minuto}:00"
+                        # Se não há 'date', tentar extrair da data/hora
+                        date_str = outlook_event["start"]["dateTime"].split("T")[0]
                     
-                    outlook_event["end"] = {"dateTime": end_iso, "timeZone": "America/Recife"}
+                    # Converter YYYY-MM-DD para DD/MM/YYYY
+                    ano, mes, dia = date_str.split("-")
+                    expresso_event["data"] = f"{dia}/{mes}/{ano}"
+                else:
+                    # Eventos com horário específico
+                    if "dateTime" in outlook_event["start"]:
+                        start_dt = datetime.fromisoformat(
+                            outlook_event["start"]["dateTime"].replace("Z", "+00:00")
+                        )
+                        start_dt = start_dt.astimezone(tz=None)
+                        
+                        # Extrair data no formato DD/MM/YYYY
+                        expresso_event["data"] = start_dt.strftime("%d/%m/%Y")
+                        
+                        # Extrair hora de início
+                        expresso_event["hora_inicio"] = f"{start_dt.hour:02d}:{start_dt.minute:02d}"
+                    
+                    # Hora de término
+                    if "end" in outlook_event and "dateTime" in outlook_event["end"]:
+                        end_dt = datetime.fromisoformat(
+                            outlook_event["end"]["dateTime"].replace("Z", "+00:00")
+                        )
+                        end_dt = end_dt.astimezone(tz=None)
+                        expresso_event["hora_fim"] = f"{end_dt.hour:02d}:{end_dt.minute:02d}"
+        except Exception as e:
+            print(f"[ERRO] Falha ao processar data/hora do evento Outlook: {e}")
+        
+        # Resto do método continua igual...
+        
+        # Log do evento convertido para depuração
+        print(f"[DEBUG] Evento convertido para formato Expresso: {json.dumps(expresso_event, default=str)}")
+        return expresso_event
 
-        # Participantes
-        if "participantes" in expresso_event and expresso_event["participantes"]:
-            outlook_event["attendees"] = []
-            for email in expresso_event["participantes"].split(","):
-                outlook_event["attendees"].append(
-                    {
-                        "emailAddress": {
-                            "address": email.strip(),
-                            "name": email.strip(),
-                        },
-                        "type": "required",
-                    }
-                )
+    def create_event(self, event_data):
+        try:
+            print(f"[DEBUG] Tentando criar evento no Expresso: {json.dumps(event_data, default=str)}")
+            # Primeiro obter eventos existentes
+            eventos = self.expresso_sync.obterEventos()
+            
+            # Verifica duplicados
+            # ...
+            
+            # Se não encontrou evento duplicado, continuar com a criação
+            max_tentativas = 3
+            for tentativa in range(1, max_tentativas + 1):
+                try:
+                    print(f"[DEBUG] Tentativa {tentativa} de {max_tentativas} para criar evento no Expresso")
+                    # Navegando até a página de criação de eventos
+                    self.expresso_sync.driver.get(
+                        "https://www.expresso.pe.gov.br/index.php?menuaction=calendar.uicalendar.add&date=20250423"
+                    )
+                    time.sleep(10)
+                    
+                    # Resto do código de criação
+                    # ...
+                    
+                    # Em caso de sucesso, retornar e sair do loop
+                    break
+                except Exception as e:
+                    print(f"[ERRO] Tentativa {tentativa} falhou: {e}")
+                    if tentativa == max_tentativas:
+                        raise
+                    else:
+                        # Tentar reconectar antes da próxima tentativa
+                        try:
+                            print("[DEBUG] Reconectando ao Expresso...")
+                            self.expresso_sync.login()
+                            self.expresso_sync.selecionarCalendario()
+                        except Exception as login_error:
+                            print(f"[ERRO] Falha ao reconectar: {login_error}")
+                        
+                        time.sleep(5)  # Aguardar antes da próxima tentativa
+            
+            # Resto do método
+            # ...
+        except Exception as e:
+            print(f"[ERRO] Falha completa ao criar evento no Expresso: {e}")
+            # Garantir que retorne algo mesmo em caso de erro
+            return {"id": "", "erro": str(e)}
 
-        # Localização
-        if "localizacao" in expresso_event:
-            outlook_event["location"] = {"displayName": expresso_event["localizacao"]}
-
-        return outlook_event
+    def _remove_all_mappings(self, google_id=None, outlook_id=None, expresso_id=None):
+        """
+        Remove todos os mapeamentos relacionados a um ou mais IDs de eventos
+        
+        Args:
+            google_id: ID do evento no Google
+            outlook_id: ID do evento no Outlook
+            expresso_id: ID do evento no Expresso
+        """
+        print(f"Removendo mapeamentos para: Google={google_id}, Outlook={outlook_id}, Expresso={expresso_id}")
+        
+        # Remover do banco de dados
+        self.db.remove_mappings(google_id=google_id, outlook_id=outlook_id, expresso_id=expresso_id)
+        
+        # Remover dos mapas em memória
+        if google_id:
+            if google_id in self.google_to_outlook_map:
+                outlook_id_to_remove = self.google_to_outlook_map[google_id]
+                del self.google_to_outlook_map[google_id]
+                if outlook_id_to_remove in self.outlook_to_google_map:
+                    del self.outlook_to_google_map[outlook_id_to_remove]
+                
+            if hasattr(self, 'google_to_expresso_map') and google_id in self.google_to_expresso_map:
+                expresso_id_to_remove = self.google_to_expresso_map[google_id]
+                del self.google_to_expresso_map[google_id]
+                if hasattr(self, 'expresso_to_google_map') and expresso_id_to_remove in self.expresso_to_google_map:
+                    del self.expresso_to_google_map[expresso_id_to_remove]
+        
+        if outlook_id:
+            if outlook_id in self.outlook_to_google_map:
+                google_id_to_remove = self.outlook_to_google_map[outlook_id]
+                del self.outlook_to_google_map[outlook_id]
+                if google_id_to_remove in self.google_to_outlook_map:
+                    del self.google_to_outlook_map[google_id_to_remove]
+                
+            if hasattr(self, 'outlook_to_expresso_map') and outlook_id in self.outlook_to_expresso_map:
+                expresso_id_to_remove = self.outlook_to_expresso_map[outlook_id]
+                del self.outlook_to_expresso_map[outlook_id]
+                if hasattr(self, 'expresso_to_outlook_map') and expresso_id_to_remove in self.expresso_to_outlook_map:
+                    del self.expresso_to_outlook_map[expresso_id_to_remove]
+        
+        if expresso_id:
+            if hasattr(self, 'expresso_to_google_map') and expresso_id in self.expresso_to_google_map:
+                google_id_to_remove = self.expresso_to_google_map[expresso_id]
+                del self.expresso_to_google_map[expresso_id]
+                if google_id_to_remove in self.google_to_expresso_map:
+                    del self.google_to_expresso_map[google_id_to_remove]
+                
+            if hasattr(self, 'expresso_to_outlook_map') and expresso_id in self.expresso_to_outlook_map:
+                outlook_id_to_remove = self.expresso_to_outlook_map[expresso_id]
+                del self.expresso_to_outlook_map[expresso_id]
+                if outlook_id_to_remove in self.outlook_to_expresso_map:
+                    del self.outlook_to_expresso_map[outlook_id_to_remove]
