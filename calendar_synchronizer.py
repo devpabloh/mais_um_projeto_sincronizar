@@ -801,11 +801,17 @@ class CalendarSynchronizer:
             mapped_ids = self.db.get_mapped_ids(google_id, "google")
             if mapped_ids and mapped_ids[0] == outlook_id:
                 print(f"Match por ID no banco: Google {google_id} -> Outlook {outlook_id}")
+                # Atualizar mapas em memória para garantir consistência
+                self.google_to_outlook_map[google_id] = outlook_id
+                self.outlook_to_google_map[outlook_id] = google_id
                 return True
             
             mapped_ids = self.db.get_mapped_ids(outlook_id, "outlook")
             if mapped_ids and mapped_ids[0] == google_id:
                 print(f"Match por ID no banco: Outlook {outlook_id} -> Google {google_id}")
+                # Atualizar mapas em memória para garantir consistência
+                self.google_to_outlook_map[google_id] = outlook_id
+                self.outlook_to_google_map[outlook_id] = google_id
                 return True
             
             # Verificar se há IDs externos armazenados nos eventos
@@ -1190,6 +1196,25 @@ class CalendarSynchronizer:
                 target_type = 'google'
             else:
                 target_type = 'google'  # Default para Expresso
+        
+        # Verificar primeiro se já existe um mapeamento no banco de dados
+        if source_type == 'google' and 'id' in event:
+            google_id = event['id']
+            mapped_ids = self.db.get_mapped_ids(google_id, 'google')
+            if mapped_ids and mapped_ids[0] and target_type == 'outlook':
+                outlook_id = mapped_ids[0]
+                if outlook_id in target_cache:
+                    print(f"  - Evento já mapeado no banco de dados: Google {google_id} -> Outlook {outlook_id}")
+                    return True, outlook_id
+        
+        elif source_type == 'outlook' and 'id' in event:
+            outlook_id = event['id']
+            mapped_ids = self.db.get_mapped_ids(outlook_id, 'outlook')
+            if mapped_ids and mapped_ids[0] and target_type == 'google':
+                google_id = mapped_ids[0]
+                if google_id in target_cache:
+                    print(f"  - Evento já mapeado no banco de dados: Outlook {outlook_id} -> Google {google_id}")
+                    return True, google_id
         
         # Se não tiver título, não podemos comparar adequadamente
         event_title = None
